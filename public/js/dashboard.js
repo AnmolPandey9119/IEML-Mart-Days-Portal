@@ -14,7 +14,19 @@ const buyersState = {
   name: "", companyName: "", emailMobile: "", city: "", state: "", country: "",
   buyerType: "", attended: "", status: "",
 };
-const ownersState = { page: 1, pageSize: 25, search: "", total: 0, rows: [] };
+const ownersState = {
+  page: 1, pageSize: 25, total: 0, rows: [],
+  urn: "", fullName: "", companyName: "", category: "", mobile: "", email: "",
+};
+const OWNER_CHIP_FIELDS = {
+  urn: "URN", fullName: "Full Name", companyName: "Company",
+  category: "Category", mobile: "Mobile", email: "Email",
+};
+function ownerFilterParams() {
+  const params = new URLSearchParams();
+  Object.keys(OWNER_CHIP_FIELDS).forEach((k) => { if (ownersState[k]) params.set(k, ownersState[k]); });
+  return params;
+}
 
 // ---------------------------------------------------------------------
 // Bootstrapping
@@ -482,14 +494,76 @@ function openVisitorModal(row, mode) {
         <div class="field"><label>Email</label><input type="text" id="evEmail" value="${esc(row.email)}" /></div>
         <div class="field"><label>Phone</label><input type="text" id="evPhone" value="${esc(row.phone)}" /></div>
         <div class="field full"><label>Address</label><input type="text" id="evAddress" value="${esc(row.address)}" /></div>
-        <div class="field"><label>City / District</label><input type="text" id="evDistrict" value="${esc(row.district)}" /></div>
-        <div class="field"><label>State</label><input type="text" id="evState" value="${esc(row.state)}" /></div>
-        <div class="field"><label>Country</label><input type="text" id="evCountry" value="${esc(row.country)}" /></div>
+        <div class="field"><label>Country</label>
+          <select id="evCountry">
+            <option value="">Select country</option>
+            ${COUNTRIES.map((c) => `<option value="${esc(c)}" ${row.country === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>State</label><div id="evStateWrap">${renderStateFieldHTML(row.country, row.state)}</div></div>
+        <div class="field"><label>City / District</label><div id="evDistrictWrap">${renderDistrictFieldHTML(row.state, row.district)}</div></div>
         <div class="field"><label>Pincode</label><input type="text" id="evPincode" value="${esc(row.pincode)}" /></div>
       </div>
     `;
+    wireGeoCascade();
   }
   backdrop.classList.add("show");
+}
+
+// ---- Cascading Country → State → District for the edit modal ----
+// State: India gets a real dropdown (36 states/UTs are stable and known).
+// Any other country gets a free-text field, since we don't have a
+// reliable global state/province list. Either way it's disabled until a
+// Country is picked, matching the public registration form's behaviour.
+function renderStateFieldHTML(country, currentState) {
+  if (!country) {
+    return `<input type="text" id="evState" value="" placeholder="Select country first" disabled />`;
+  }
+  if (country === "India") {
+    const known = INDIA_STATES.includes(currentState);
+    return `
+      <select id="evState">
+        <option value="">Select state</option>
+        ${INDIA_STATES.map((s) => `<option value="${esc(s)}" ${currentState === s ? "selected" : ""}>${esc(s)}</option>`).join("")}
+        ${currentState && !known ? `<option value="${esc(currentState)}" selected>${esc(currentState)} (existing value)</option>` : ""}
+      </select>
+    `;
+  }
+  return `<input type="text" id="evState" value="${esc(currentState)}" placeholder="State / Province" />`;
+}
+
+// District is always free-text (district lists change too often to
+// hardcode reliably) but stays disabled until a State is chosen.
+function renderDistrictFieldHTML(currentStateValue, currentDistrict) {
+  if (!currentStateValue) {
+    return `<input type="text" id="evDistrict" value="" placeholder="Select state first" disabled />`;
+  }
+  return `<input type="text" id="evDistrict" value="${esc(currentDistrict)}" placeholder="City / District" />`;
+}
+
+// Re-wires the State/District blocks whenever Country or State changes,
+// so District only ever unlocks once its parent field has a value.
+function wireGeoCascade() {
+  const countryEl = document.getElementById("evCountry");
+  if (!countryEl) return;
+
+  const attachStateListener = () => {
+    const stateEl = document.getElementById("evState");
+    if (!stateEl) return;
+    const evt = stateEl.tagName === "SELECT" ? "change" : "input";
+    stateEl.addEventListener(evt, () => {
+      document.getElementById("evDistrictWrap").innerHTML =
+        renderDistrictFieldHTML(stateEl.value, "");
+    });
+  };
+
+  countryEl.addEventListener("change", () => {
+    document.getElementById("evStateWrap").innerHTML = renderStateFieldHTML(countryEl.value, "");
+    document.getElementById("evDistrictWrap").innerHTML = renderDistrictFieldHTML("", "");
+    attachStateListener();
+  });
+
+  attachStateListener();
 }
 
 document.getElementById("visitorModalCancel").addEventListener("click", () => {
@@ -541,14 +615,19 @@ function renderOwners() {
   `;
   document.getElementById("addOwnerBtn").addEventListener("click", () => openOwnerModal());
   document.getElementById("exportOwnersBtn").addEventListener("click", () => {
-    const params = new URLSearchParams();
-    if (ownersState.search) params.set("search", ownersState.search);
-    window.location.href = "/api/mart-owners/export?" + params.toString();
+    window.location.href = "/api/mart-owners/export?" + ownerFilterParams().toString();
   });
 
   viewArea.innerHTML = `
     <div class="toolbar">
-      <input type="text" id="ownerSearch" placeholder="Search name, company, email, phone…" value="${esc(ownersState.search)}" />
+      <div class="field-mini"><label>URN</label><input type="text" id="oUrn" value="${esc(ownersState.urn)}" /></div>
+      <div class="field-mini"><label>Full Name</label><input type="text" id="oFullName" value="${esc(ownersState.fullName)}" /></div>
+      <div class="field-mini"><label>Company Name</label><input type="text" id="oCompanyName" value="${esc(ownersState.companyName)}" /></div>
+      <div class="field-mini"><label>Category</label><input type="text" id="oCategory" value="${esc(ownersState.category)}" /></div>
+      <div class="field-mini"><label>Mobile</label><input type="text" id="oMobile" value="${esc(ownersState.mobile)}" /></div>
+      <div class="field-mini"><label>Email</label><input type="text" id="oEmail" value="${esc(ownersState.email)}" /></div>
+    </div>
+    <div class="filters-summary">
       <span class="result-count" id="ownerResultCount"></span>
     </div>
     <div class="table-wrap">
@@ -578,15 +657,26 @@ function renderOwners() {
     loadOwners();
   });
 
+  // Each field filters ONLY its own column — no combined search box.
   let searchTimer;
-  document.getElementById("ownerSearch").addEventListener("input", (e) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      ownersState.search = e.target.value;
-      ownersState.page = 1;
-      loadOwners();
-    }, 350);
-  });
+  const wireOwnerFilter = (id, stateKey) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        ownersState[stateKey] = el.value;
+        ownersState.page = 1;
+        loadOwners();
+      }, 350);
+    });
+  };
+  wireOwnerFilter("oUrn", "urn");
+  wireOwnerFilter("oFullName", "fullName");
+  wireOwnerFilter("oCompanyName", "companyName");
+  wireOwnerFilter("oCategory", "category");
+  wireOwnerFilter("oMobile", "mobile");
+  wireOwnerFilter("oEmail", "email");
+
   document.getElementById("ownerPrevPage").addEventListener("click", () => {
     if (ownersState.page > 1) { ownersState.page--; loadOwners(); }
   });
@@ -602,8 +692,9 @@ async function loadOwners() {
   const area = document.getElementById("ownerTableArea");
   if (!area) return;
   area.innerHTML = `<div class="loading-state">Loading…</div>`;
-  const params = new URLSearchParams({ page: ownersState.page, pageSize: ownersState.pageSize });
-  if (ownersState.search) params.set("search", ownersState.search);
+  const params = ownerFilterParams();
+  params.set("page", ownersState.page);
+  params.set("pageSize", ownersState.pageSize);
 
   try {
     const res = await fetch("/api/mart-owners?" + params.toString());

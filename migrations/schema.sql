@@ -5,20 +5,18 @@
 -- It only ADDS things — it never drops or rewrites existing columns,
 -- so your visitor registrations are 100% safe. Safe to re-run.
 --
--- BEFORE running this: confirm your buyers table is actually called
--- "buyers". If it's named something else, replace "buyers" below
--- with the real name (and update buyers_TABLE in server.js to match).
--- Easiest way to check: run this first —
---   SELECT table_name FROM information_schema.tables WHERE table_schema='public';
+-- Confirmed table name: "mart_days_registrations" (urn TEXT PRIMARY KEY,
+-- FK to public.visitors(urn) ON DELETE CASCADE). If this ever changes,
+-- update buyers_TABLE in server.js to match.
 
 -- 1) Attendance tracking — new columns only this portal writes to.
-ALTER TABLE buyers ADD COLUMN IF NOT EXISTS attended BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE buyers ADD COLUMN IF NOT EXISTS attended_at TIMESTAMPTZ;
+ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS attended BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS attended_at TIMESTAMPTZ;
 
 -- 1b) Registration approval workflow (Approve / Reject action buttons).
 -- Defaults every existing row to 'Registered' so nothing looks rejected
 -- by accident.
-ALTER TABLE buyers ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Registered';
+ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Registered';
 
 -- 2) Mart Owners — brand-new, blank table. Kept simple on purpose;
 -- add columns later with more ALTER TABLE ... ADD COLUMN statements

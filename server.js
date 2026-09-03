@@ -40,11 +40,12 @@ const BRANDING = {
 // real column names straight from Postgres. Then just edit the values
 // below to match and redeploy.
 //
-// Confirmed live schema (given by the team): the `buyers` table has
-// NO separate `id` column — `urn` (TEXT) is itself the primary key, and
+// Confirmed live schema (given by the team): the buyer registrations
+// table is `mart_days_registrations`. It has NO separate `id` column —
+// `urn` (TEXT) is itself the primary key (FK to public.visitors), and
 // the timestamp column is `registered_at`, not `created_at`.
 // ---------------------------------------------------------------------
-const buyers_TABLE = process.env.buyers_TABLE || "buyers";
+const buyers_TABLE = process.env.buyers_TABLE || "mart_days_registrations";
 const COL = {
   id: "urn", // urn IS the primary key — there is no separate id column
   urn: "urn",
@@ -453,16 +454,25 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
 // manually (or via CSV import later) whenever the full list is ready.
 // ---------------------------------------------------------------------
 
-function buildOwnerWhere(searchQuery) {
-  const search = (searchQuery || "").trim();
+// Each filter is its OWN field — they combine with AND, same pattern as
+// buildVisitorWhere() for buyers (no more single combined search box).
+function buildOwnerWhere(query) {
   const clauses = [];
   const values = [];
-  if (search) {
-    values.push(`%${search}%`);
-    clauses.push(
-      `(urn ILIKE $${values.length} OR full_name ILIKE $${values.length} OR company_name ILIKE $${values.length} OR email ILIKE $${values.length} OR mobile_number ILIKE $${values.length})`
-    );
-  }
+
+  const addIlike = (col, val) => {
+    if (!val || !val.trim()) return;
+    values.push(`%${val.trim()}%`);
+    clauses.push(`${col} ILIKE $${values.length}`);
+  };
+
+  addIlike("urn", query.urn);
+  addIlike("full_name", query.fullName);
+  addIlike("company_name", query.companyName);
+  addIlike("category", query.category);
+  addIlike("mobile_number", query.mobile);
+  addIlike("email", query.email);
+
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   return { where, values };
 }
@@ -471,7 +481,7 @@ app.get("/api/mart-owners", requireAuth, async (req, res) => {
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 25, 1), 200);
   const offset = (page - 1) * pageSize;
-  const { where, values } = buildOwnerWhere(req.query.search);
+  const { where, values } = buildOwnerWhere(req.query);
 
   try {
     const countResult = await pool.query(`SELECT COUNT(*) FROM mart_owners ${where}`, values);
@@ -489,7 +499,7 @@ app.get("/api/mart-owners", requireAuth, async (req, res) => {
 });
 
 app.get("/api/mart-owners/export", requireAuth, async (req, res) => {
-  const { where, values } = buildOwnerWhere(req.query.search);
+  const { where, values } = buildOwnerWhere(req.query);
   try {
     const result = await pool.query(`SELECT * FROM mart_owners ${where} ORDER BY created_at DESC`, values);
     const headers = ["urn", "full_name", "company_name", "category", "mobile_number", "email", "notes", "created_at"];
