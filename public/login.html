@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="pageTitleTag">Admin Login</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="login-shell">
+  <div class="login-split">
+
+    <div class="login-brand-panel">
+      <div class="login-brand-inner">
+        <div class="brand-mark">IEML</div>
+        <div class="login-brand-title" id="brandTitle">Mart Sourcing Days</div>
+        <div class="login-brand-tag" id="brandTag">Source Better. Discover More.</div>
+        <div class="login-brand-dates" id="brandDates"></div>
+      </div>
+    </div>
+
+    <div class="login-form-panel">
+      <div class="login-card">
+        <h1 id="welcomeHeading">Admin Portal</h1>
+        <p class="sub">Sign in to manage visitor registrations.</p>
+
+        <form id="loginForm">
+          <div class="field">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username" required />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required />
+          </div>
+          <button type="submit" class="primary-btn">Sign In</button>
+          <div id="formMsg" class="form-msg"></div>
+        </form>
+
+        <div id="footerNote" class="login-footer-note"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("loginForm");
+  const msg = document.getElementById("formMsg");
+
+  fetch("/api/branding")
+    .then((r) => r.json())
+    .then((b) => {
+      document.getElementById("pageTitleTag").textContent = `Admin Login — ${b.eventName}`;
+      document.getElementById("brandTag").textContent = b.tagline;
+      document.getElementById("brandDates").textContent = `${b.dateRange} · ${b.venue}`;
+      document.getElementById("footerNote").textContent = `© ${b.eventName}`;
+    })
+    .catch(() => {});
+
+  fetch("/api/session")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.authenticated) window.location.href = "/dashboard.html";
+    });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msg.className = "form-msg";
+    msg.textContent = "";
+    const submitBtn = form.querySelector("button");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in...";
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value.trim(),
+          password: document.getElementById("password").value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sign in failed.");
+      window.location.href = "/dashboard.html";
+    } catch (err) {
+      msg.classList.add("error");
+      msg.textContent = err.message || "Sign in failed.";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+    }
+  });
+</script>
+</body>
+</html>

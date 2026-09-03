@@ -1,0 +1,20 @@
+{
+  "name": "ieml-mart-days-portal",
+  "version": "1.0.0",
+  "description": "Admin portal for IEML Mart Sourcing Days — reads visitor registrations from the same Neon database used by the public registration site (ieml-martdays-registration.vercel.app), plus a simple Mart Owners list and Visitor analytics.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migrations/run-migration.js"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5"
+  }
+}

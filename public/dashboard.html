@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="pageTitleTag">Admin Portal</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-mark">✺</div>
+      <div class="sidebar-brand-org">India Exposition Mart Limited</div>
+      <div class="sidebar-brand-edition" id="brandEdition"></div>
+      <div class="sidebar-brand-title">Sourcing Days</div>
+      <div class="sidebar-brand-tag" id="brandTag"></div>
+      <div class="sidebar-brand-divider"></div>
+      <div class="sidebar-brand-row">📅 <span id="eventCardDates"></span></div>
+      <div class="sidebar-brand-row">📍 <span id="eventCardVenue"></span></div>
+    </div>
+
+    <nav class="nav-list" id="navList">
+      <button class="nav-item" data-view="overview">🏠 Overview</button>
+      <button class="nav-item" data-view="buyers">👥 Buyers</button>
+      <button class="nav-item" data-view="martOwners">🏬 Mart Owners</button>
+      <button class="nav-item" data-view="analytics">📊 Analytics</button>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <h1 id="pageTitle">Overview</h1>
+      <div class="main-header-actions" id="headerActions"></div>
+    </div>
+
+    <div id="viewArea"></div>
+  </main>
+</div>
+
+<div class="topbar-avatar-wrap" id="avatarWrap">
+  <button class="avatar-btn" id="avatarBtn" title="Account" aria-label="Account menu">👤</button>
+  <div class="avatar-menu" id="avatarMenu">
+    <button class="avatar-menu-item" id="homeMenuBtn">🏠 Home</button>
+    <button class="avatar-menu-item" id="logoutMenuBtn">🚪 Logout</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="ownerModalBackdrop">
+  <div class="modal-card">
+    <h2 id="ownerModalTitle">Add Mart Owner</h2>
+    <div id="ownerModalBody"></div>
+    <div class="modal-error" id="ownerModalError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="ownerModalCancel">Cancel</button>
+      <button class="btn primary" id="ownerModalSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="visitorModalBackdrop">
+  <div class="modal-card modal-card-wide">
+    <h2 id="visitorModalTitle">Buyer Details</h2>
+    <div id="visitorModalBody"></div>
+    <div class="modal-error" id="visitorModalError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="visitorModalCancel">Close</button>
+      <button class="btn primary" id="visitorModalSave" style="display:none;">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/dashboard.js"></script>
+</body>
+</html>
