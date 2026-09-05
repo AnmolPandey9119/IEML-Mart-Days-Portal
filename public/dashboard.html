@@ -27,6 +27,8 @@
       <button class="nav-item" data-view="buyers">👥 Buyers</button>
       <button class="nav-item" data-view="martOwners">🏬 Mart Owners</button>
       <button class="nav-item" data-view="analytics">📊 Analytics</button>
+      <button class="nav-item" data-view="printHistory">🖨️ Print History</button>
+      <button class="nav-item nav-item-danger" data-view="dangerZone">⚠️ Danger Zone</button>
     </nav>
   </aside>
 
@@ -68,6 +70,22 @@
     <div class="modal-actions">
       <button class="btn" id="visitorModalCancel">Close</button>
       <button class="btn primary" id="visitorModalSave" style="display:none;">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Second-step "are you absolutely sure" popup for the Danger Zone.
+     Only reachable after the admin has already typed the exact
+     confirmation phrase on the Danger Zone page itself. -->
+<div class="modal-backdrop" id="dangerConfirmModalBackdrop">
+  <div class="modal-card">
+    <h2>⚠️ Final confirmation</h2>
+    <p id="dangerConfirmMessage" style="font-size:14px;color:#45303d;line-height:1.5;"></p>
+    <p style="font-size:13px;color:var(--error);font-weight:700;">This cannot be undone.</p>
+    <div class="modal-error" id="dangerConfirmError"></div>
+    <div class="modal-actions">
+      <button class="btn" id="dangerConfirmCancel">Cancel</button>
+      <button class="btn danger" id="dangerConfirmProceed">Yes, delete everything</button>
     </div>
   </div>
 </div>

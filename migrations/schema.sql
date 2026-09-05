@@ -37,3 +37,14 @@ CREATE TABLE IF NOT EXISTS mart_owners (
 -- (before URN was added), this adds the column without touching any
 -- rows you've already entered.
 ALTER TABLE mart_owners ADD COLUMN IF NOT EXISTS urn TEXT;
+
+-- 3) Badge print history — one row per "Print Badge" click from this
+-- portal. ON DELETE CASCADE means if a buyer registration is ever
+-- deleted, their print log rows go with it (no orphaned history).
+CREATE TABLE IF NOT EXISTS badge_print_log (
+  id SERIAL PRIMARY KEY,
+  urn TEXT NOT NULL REFERENCES mart_days_registrations(urn) ON DELETE CASCADE,
+  printed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_badge_print_log_urn ON badge_print_log (urn);
+CREATE INDEX IF NOT EXISTS idx_badge_print_log_printed_at ON badge_print_log (printed_at);

@@ -159,6 +159,9 @@ nav.nav-list { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 }
 .nav-item:hover { background: var(--pink-soft); }
 .nav-item.active { background: var(--pink-bg); color: var(--pink-dark); }
+.nav-item-danger { color: #ffd3d3; margin-top: 4px; }
+.nav-item-danger:hover { background: rgba(220,53,69,0.25); }
+.nav-item-danger.active { background: rgba(220,53,69,0.3); color: #fff; }
 /* ---------- Top-right account menu ---------- */
 .topbar-avatar-wrap { position: fixed; top: 18px; right: 26px; z-index: 200; }
 .avatar-btn {
@@ -193,6 +196,8 @@ nav.nav-list { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .btn:hover { background: var(--pink-soft); border-color: var(--pink-bg); }
 .btn.primary { background: var(--pink); border-color: var(--pink); color: #fff; }
 .btn.primary:hover { background: var(--pink-dark); }
+.btn.danger { background: var(--error); border-color: var(--error); color: #fff; }
+.btn.danger:hover { background: #a11f1f; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---------- Cards / stats ---------- */
@@ -209,6 +214,17 @@ nav.nav-list { display: flex; flex-direction: column; gap: 3px; flex: 1; }
   padding: 18px; box-shadow: var(--shadow); margin-bottom: 18px;
 }
 .panel h3 { margin: 0 0 14px; font-size: 15px; }
+.danger-panel {
+  background: #fff5f5; border: 2px solid #f3b7b7; border-radius: 12px;
+  padding: 22px; margin-bottom: 20px;
+}
+.danger-panel h3 { color: var(--error); margin: 0 0 8px; font-size: 16px; }
+.danger-panel p { font-size: 13.5px; color: #6b3d3d; line-height: 1.6; margin: 0 0 14px; }
+.danger-confirm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.danger-confirm-row input[type="text"] {
+  padding: 10px 12px; border-radius: 8px; border: 1px solid #e3a9a9;
+  font-size: 14px; min-width: 260px;
+}
 .bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 9px; }
 .bar-row .bar-label { width: 150px; flex: 0 0 150px; color: #4a3a45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-row .bar-track { flex: 1; background: var(--pink-soft); border-radius: 6px; height: 10px; overflow: hidden; }
@@ -288,6 +304,7 @@ tbody tr:hover { background: #fffafc; }
 .action-btn.approve { background: var(--success-bg); color: var(--success); }
 .action-btn.reject { background: #fff1e0; color: #b3690a; }
 .action-btn.delete { background: var(--error-bg); color: var(--error); }
+.action-btn.print { background: #eaf6f0; color: #157347; }
 .action-btn:hover { filter: brightness(0.95); }
 .action-btn:disabled { opacity: 0.5; }
 

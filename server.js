@@ -603,6 +603,137 @@ app.delete("/api/mart-owners/:id", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/buyers/:id/print — the "Print Badge" action. Increments
+// print_count, auto-checks the buyer in (attended = true) but never
+// overwrites an existing attended_at, and logs the event to
+// badge_print_log for the day-wise history/analytics view. Uses a
+// transaction so the counter and the log entry never drift apart.
+app.post("/api/buyers/:id/print", requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const updateResult = await client.query(
+      `UPDATE ${buyers_TABLE}
+       SET ${COL.printCount} = COALESCE(${COL.printCount}, 0) + 1,
+           ${COL.attended} = TRUE,
+           ${COL.attendedAt} = COALESCE(${COL.attendedAt}, now())
+       WHERE ${COL.id} = $1
+       RETURNING *`,
+      [req.params.id]
+    );
+    if (updateResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Buyer not found." });
+    }
+    await client.query(`INSERT INTO badge_print_log (urn) VALUES ($1)`, [req.params.id]);
+    await client.query("COMMIT");
+    res.json({ success: true, row: mapVisitorRow(updateResult.rows[0]) });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("print badge failed:", err.message);
+    res.status(500).json({ error: "Could not record badge print.", detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ---------------------------------------------------------------------
+// Print history — audit trail of every "Print Badge" click, day-wise
+// counts for the analytics chart, and a "Clear History" action. Clearing
+// only wipes this log table; it never touches print_count/attended on
+// the buyer rows themselves — those stay as the buyer's own record.
+// ---------------------------------------------------------------------
+app.get("/api/print-history", requireAuth, async (req, res) => {
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 25, 1), 200);
+  const offset = (page - 1) * pageSize;
+  const day = req.query.day && /^\d{4}-\d{2}-\d{2}$/.test(req.query.day) ? req.query.day : null;
+  const where = day ? "WHERE TO_CHAR(l.printed_at, 'YYYY-MM-DD') = $1" : "";
+  const values = day ? [day] : [];
+
+  try {
+    const countResult = await pool.query(`SELECT COUNT(*) FROM badge_print_log l ${where}`, values);
+    const total = parseInt(countResult.rows[0].count, 10);
+    const dataValues = [...values, pageSize, offset];
+    const dataResult = await pool.query(
+      `SELECT l.id, l.urn, l.printed_at,
+              b.${COL.fullName} AS full_name, b.${COL.companyName} AS company_name
+       FROM badge_print_log l
+       LEFT JOIN ${buyers_TABLE} b ON b.${COL.urn} = l.urn
+       ${where}
+       ORDER BY l.printed_at DESC
+       LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      dataValues
+    );
+    res.json({ rows: dataResult.rows, total, page, pageSize });
+  } catch (err) {
+    console.error("list print-history failed:", err.message);
+    res.status(500).json({ error: "Could not load print history.", detail: err.message });
+  }
+});
+
+app.get("/api/print-history/summary", requireAuth, async (req, res) => {
+  try {
+    const [totalRes, todayRes, byDayRes] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS count FROM badge_print_log`),
+      pool.query(`SELECT COUNT(*)::int AS count FROM badge_print_log WHERE printed_at::date = now()::date`),
+      pool.query(
+        `SELECT TO_CHAR(printed_at, 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+         FROM badge_print_log GROUP BY 1 ORDER BY 1 DESC LIMIT 30`
+      ),
+    ]);
+    res.json({
+      totalPrints: totalRes.rows[0].count,
+      todayPrints: todayRes.rows[0].count,
+      byDay: byDayRes.rows,
+    });
+  } catch (err) {
+    console.error("print-history summary failed:", err.message);
+    res.status(500).json({ error: "Could not load print history summary.", detail: err.message });
+  }
+});
+
+// DELETE /api/print-history — wipes the audit log only (see note above).
+app.delete("/api/print-history", requireAuth, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM badge_print_log");
+    res.json({ success: true });
+  } catch (err) {
+    console.error("clear print-history failed:", err.message);
+    res.status(500).json({ error: "Could not clear print history.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------
+// DANGER ZONE — permanently deletes every buyer registration (and, via
+// ON DELETE CASCADE, their print history). This is deliberately made
+// awkward to trigger by accident:
+//   1. The frontend requires the admin to type an exact phrase before
+//      the button even becomes clickable.
+//   2. The frontend then shows a second "are you absolutely sure" popup
+//      naming exactly how many rows will be destroyed.
+//   3. This endpoint ALSO independently requires the same exact phrase
+//      in the request body — so this can't be triggered by a stray
+//      button click, a replayed request, or a frontend bug alone.
+// There is no "undo" — this is a genuine, permanent delete.
+// ---------------------------------------------------------------------
+const DANGER_DELETE_ALL_PHRASE = "DELETE ALL DATA";
+app.delete("/api/buyers/danger-zone/delete-all", requireAuth, async (req, res) => {
+  const phrase = (req.body && req.body.confirmationPhrase) || "";
+  if (phrase !== DANGER_DELETE_ALL_PHRASE) {
+    return res.status(400).json({
+      error: `Confirmation phrase did not match. You must send exactly: "${DANGER_DELETE_ALL_PHRASE}"`,
+    });
+  }
+  try {
+    const result = await pool.query(`DELETE FROM ${buyers_TABLE}`);
+    res.json({ success: true, deletedCount: result.rowCount });
+  } catch (err) {
+    console.error("DANGER ZONE delete-all failed:", err.message);
+    res.status(500).json({ error: "Could not delete all data.", detail: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------
 // Schema check — a safe, read-only way to confirm the column-name
 // mapping above actually matches your live Neon table, without needing

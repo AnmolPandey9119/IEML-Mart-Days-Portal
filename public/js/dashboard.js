@@ -80,6 +80,8 @@ function setView(view) {
   else if (view === "buyers") renderbuyers();
   else if (view === "martOwners") renderOwners();
   else if (view === "analytics") renderAnalytics();
+  else if (view === "printHistory") renderPrintHistory();
+  else if (view === "dangerZone") renderDangerZone();
 }
 
 function esc(str) {
@@ -106,12 +108,15 @@ async function renderOverview() {
       fetch("/api/mart-owners?pageSize=1").then((r) => r.json()),
     ]);
     const analytics = await fetch("/api/analytics/buyers").then((r) => r.json());
+    const printSummary = await fetch("/api/print-history/summary").then((r) => r.json()).catch(() => ({ totalPrints: 0, todayPrints: 0 }));
     viewArea.innerHTML = `
       <div class="stat-grid">
         <div class="stat-card"><div class="num">${buyersRes.total ?? 0}</div><div class="label">Total Registered Buyers</div></div>
         <div class="stat-card"><div class="num">${analytics.attended ?? 0}</div><div class="label">Checked In at Mart</div></div>
         <div class="stat-card"><div class="num">${analytics.notAttended ?? 0}</div><div class="label">Yet to Arrive</div></div>
         <div class="stat-card"><div class="num">${ownersRes.total ?? 0}</div><div class="label">Mart Owners on File</div></div>
+        <div class="stat-card"><div class="num">${printSummary.totalPrints ?? 0}</div><div class="label">Total Badges Printed</div></div>
+        <div class="stat-card"><div class="num">${printSummary.todayPrints ?? 0}</div><div class="label">Printed Today</div></div>
       </div>
       <div class="panel">
         <h3>Quick links</h3>
@@ -356,6 +361,7 @@ async function loadbuyers() {
                   <div class="actions-cell">
                     <button class="action-btn view" title="View" data-view="${esc(row.id)}">👁</button>
                     <button class="action-btn edit" title="Edit" data-edit="${esc(row.id)}">✏️</button>
+                    <button class="action-btn print" title="Print Badge (auto checks-in)" data-print="${esc(row.id)}">🖨️</button>
                     <button class="action-btn approve" title="Approve" data-approve="${esc(row.id)}">✔️</button>
                     <button class="action-btn reject" title="Reject" data-reject="${esc(row.id)}">✖️</button>
                     <button class="action-btn delete" title="Delete" data-delete="${esc(row.id)}">🗑️</button>
@@ -411,6 +417,23 @@ async function loadbuyers() {
         btn.addEventListener("click", () => {
           const row = buyersState.rows.find((r) => String(r.id) === btn.dataset.edit);
           if (row) openVisitorModal(row, "edit");
+        });
+      });
+      area.querySelectorAll("[data-print]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const row = buyersState.rows.find((r) => String(r.id) === btn.dataset.print);
+          const name = row ? row.fullName : "this buyer";
+          if (!confirm(`Print badge for ${name}? This will also mark them as checked-in.`)) return;
+          btn.disabled = true;
+          try {
+            const r = await fetch(`/api/buyers/${btn.dataset.print}/print`, { method: "POST" });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || "Could not print badge.");
+            loadbuyers();
+          } catch (err) {
+            alert(err.message);
+            btn.disabled = false;
+          }
         });
       });
       area.querySelectorAll("[data-approve]").forEach((btn) => {
@@ -895,6 +918,195 @@ async function renderAnalytics() {
   } catch (err) {
     viewArea.innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
   }
+}
+
+// ---------------------------------------------------------------------
+// Print History — audit trail of every "Print Badge" click, with
+// day-wise counts (bar chart, same pattern as Analytics) and a
+// "Clear History" action. Clearing this log never touches any buyer's
+// own print_count or checked-in status — it's purely the audit trail.
+// ---------------------------------------------------------------------
+const printHistoryState = { page: 1, pageSize: 25 };
+
+async function renderPrintHistory() {
+  pageTitle.textContent = "Print History";
+  headerActions.innerHTML = `<button class="btn danger" id="clearHistoryBtn">🗑️ Clear History</button>`;
+  document.getElementById("clearHistoryBtn").addEventListener("click", async () => {
+    if (!confirm("Clear the entire print history log? This only removes the audit trail — buyers keep their individual print counts and checked-in status. This cannot be undone.")) return;
+    try {
+      const r = await fetch("/api/print-history", { method: "DELETE" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not clear history.");
+      printHistoryState.page = 1;
+      renderPrintHistory();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  viewArea.innerHTML = `<div class="loading-state">Loading print history…</div>`;
+  try {
+    const [summary, historyRes] = await Promise.all([
+      fetch("/api/print-history/summary").then((r) => r.json()),
+      fetch(`/api/print-history?page=${printHistoryState.page}&pageSize=${printHistoryState.pageSize}`).then((r) => r.json()),
+    ]);
+    const maxDay = Math.max(1, ...summary.byDay.map((r) => r.count));
+    const maxPage = Math.max(1, Math.ceil(historyRes.total / printHistoryState.pageSize));
+
+    viewArea.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num">${summary.totalPrints}</div><div class="label">Total Badges Printed</div></div>
+        <div class="stat-card"><div class="num">${summary.todayPrints}</div><div class="label">Printed Today</div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Prints per day (last 30 days with activity)</h3>
+        ${summary.byDay.length ? summary.byDay.map((r) => `
+          <div class="bar-row">
+            <span class="bar-label">${esc(r.day)}</span>
+            <span class="bar-track"><span class="bar-fill" style="width:${(r.count / maxDay) * 100}%"></span></span>
+            <span class="bar-count">${r.count}</span>
+          </div>`).join("") : `<div class="empty-state">No badges printed yet.</div>`}
+      </div>
+
+      <div class="panel">
+        <h3>Recent print events</h3>
+        ${historyRes.rows.length ? `
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Printed At</th><th>URN</th><th>Name</th><th>Company</th></tr></thead>
+              <tbody>
+                ${historyRes.rows.map((r) => `
+                  <tr>
+                    <td>${fmtDate(r.printed_at)}</td>
+                    <td>${esc(r.urn)}</td>
+                    <td>${esc(r.full_name) || "—"}</td>
+                    <td>${esc(r.company_name) || "—"}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="pager" style="margin-top:14px;">
+            <button class="btn" id="phPrevPage" ${printHistoryState.page <= 1 ? "disabled" : ""}>← Prev</button>
+            <span>Page ${historyRes.page} / ${maxPage}</span>
+            <button class="btn" id="phNextPage" ${printHistoryState.page >= maxPage ? "disabled" : ""}>Next →</button>
+          </div>
+        ` : `<div class="empty-state">No print events yet.</div>`}
+      </div>
+    `;
+
+    const prevBtn = document.getElementById("phPrevPage");
+    const nextBtn = document.getElementById("phNextPage");
+    if (prevBtn) prevBtn.addEventListener("click", () => { printHistoryState.page--; renderPrintHistory(); });
+    if (nextBtn) nextBtn.addEventListener("click", () => { printHistoryState.page++; renderPrintHistory(); });
+  } catch (err) {
+    viewArea.innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Danger Zone — permanently deletes every buyer registration. Guarded by
+// TWO separate confirmations before the request even goes out:
+//   1. Type the exact phrase into the text box (button stays disabled
+//      until it matches character-for-character).
+//   2. A second popup names exactly how many rows will be destroyed and
+//      requires one more explicit click.
+// The server independently re-checks the same phrase — see server.js.
+// ---------------------------------------------------------------------
+const DANGER_PHRASE = "DELETE ALL DATA";
+
+async function renderDangerZone() {
+  pageTitle.textContent = "Danger Zone";
+  headerActions.innerHTML = "";
+  viewArea.innerHTML = `<div class="loading-state">Loading…</div>`;
+
+  let totalBuyers = 0;
+  try {
+    const buyersRes = await fetch("/api/buyers?pageSize=1").then((r) => r.json());
+    totalBuyers = buyersRes.total ?? 0;
+  } catch {
+    // fall through with totalBuyers = 0 — the count is informational only
+  }
+
+  viewArea.innerHTML = `
+    <div class="danger-panel">
+      <h3>⚠️ Delete ALL buyer registrations</h3>
+      <p>
+        This permanently deletes every row in the Buyers table — currently
+        <strong>${totalBuyers}</strong> registration${totalBuyers === 1 ? "" : "s"} —
+        along with their print history. Mart Owners are not affected.
+        <strong>There is no undo.</strong>
+      </p>
+      <p>Type <code>${esc(DANGER_PHRASE)}</code> exactly to unlock the delete button:</p>
+      <div class="danger-confirm-row">
+        <input type="text" id="dangerPhraseInput" placeholder="${esc(DANGER_PHRASE)}" autocomplete="off" />
+        <button class="btn danger" id="dangerDeleteBtn" disabled>Delete All Data</button>
+      </div>
+      <div class="modal-error" id="dangerZoneError" style="margin-top:10px;"></div>
+    </div>
+  `;
+
+  const input = document.getElementById("dangerPhraseInput");
+  const deleteBtn = document.getElementById("dangerDeleteBtn");
+  const errorEl = document.getElementById("dangerZoneError");
+
+  input.addEventListener("input", () => {
+    deleteBtn.disabled = input.value !== DANGER_PHRASE;
+  });
+
+  deleteBtn.addEventListener("click", () => {
+    errorEl.textContent = "";
+    openDangerConfirmModal(
+      `You are about to permanently delete all ${totalBuyers} buyer registration${totalBuyers === 1 ? "" : "s"} and their print history. This action cannot be reversed.`,
+      async () => {
+        const res = await fetch("/api/buyers/danger-zone/delete-all", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmationPhrase: DANGER_PHRASE }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not delete all data.");
+        return data;
+      },
+      () => { renderDangerZone(); }
+    );
+  });
+}
+
+// Generic "final confirmation" popup used by the Danger Zone. `onConfirm`
+// must return a Promise; `onDone` runs after a successful delete.
+function openDangerConfirmModal(message, onConfirm, onDone) {
+  const backdrop = document.getElementById("dangerConfirmModalBackdrop");
+  const messageEl = document.getElementById("dangerConfirmMessage");
+  const errorEl = document.getElementById("dangerConfirmError");
+  const proceedBtn = document.getElementById("dangerConfirmProceed");
+  const cancelBtn = document.getElementById("dangerConfirmCancel");
+  messageEl.textContent = message;
+  errorEl.textContent = "";
+  proceedBtn.disabled = false;
+  backdrop.classList.add("show");
+
+  const cleanup = () => {
+    backdrop.classList.remove("show");
+    proceedBtn.removeEventListener("click", handleProceed);
+    cancelBtn.removeEventListener("click", handleCancel);
+  };
+  const handleCancel = () => cleanup();
+  const handleProceed = async () => {
+    proceedBtn.disabled = true;
+    errorEl.textContent = "";
+    try {
+      const result = await onConfirm();
+      cleanup();
+      alert(`Done. ${result.deletedCount ?? ""} row(s) deleted.`.trim());
+      if (onDone) onDone();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      proceedBtn.disabled = false;
+    }
+  };
+  proceedBtn.addEventListener("click", handleProceed);
+  cancelBtn.addEventListener("click", handleCancel);
 }
 
 // ---------------------------------------------------------------------
