@@ -42,8 +42,11 @@ const BRANDING = {
 //
 // Confirmed live schema (given by the team): the buyer registrations
 // table is `mart_days_registrations`. It has NO separate `id` column —
-// `urn` (TEXT) is itself the primary key (FK to public.visitors), and
-// the timestamp column is `registered_at`, not `created_at`.
+// `urn` (TEXT) is itself the primary key, and the timestamp column is
+// `registered_at`, not `created_at`. The registration form and its badge
+// print/scan kiosk also now write: nature_of_business, annual_turnover,
+// known_through, online_seller, products_of_interest, print_count,
+// scan_count, last_scanned_at, badge_download_count.
 // ---------------------------------------------------------------------
 const buyers_TABLE = process.env.buyers_TABLE || "mart_days_registrations";
 const COL = {
@@ -68,14 +71,28 @@ const COL = {
   attendedAt: "attended_at",
   // Also added by migrations/schema.sql — registration approval workflow.
   status: "status",
+  // Business/interest details collected by the registration form.
+  natureOfBusiness: "nature_of_business",
+  annualTurnover: "annual_turnover",
+  knownThrough: "known_through",
+  onlineSeller: "online_seller",
+  productsOfInterest: "products_of_interest",
+  // Badge print/scan tracking — written by the registration site's
+  // badge kiosk/scanner, read-only from this portal's point of view.
+  printCount: "print_count",
+  scanCount: "scan_count",
+  lastScannedAt: "last_scanned_at",
+  badgeDownloadCount: "badge_download_count",
 };
 const STATUS_VALUES = ["Registered", "Approved", "Rejected"];
 // Fields the "Edit" action is allowed to change. Deliberately excludes
-// urn/registered_at/attended — those are either identity or handled by
-// their own dedicated actions.
+// urn/registered_at/attended/print_count/scan_count/last_scanned_at/
+// badge_download_count — those are either identity, handled by their own
+// dedicated actions, or owned by the badge kiosk/scanner, not the admin.
 const EDITABLE_VISITOR_FIELDS = [
   "buyerType", "fullName", "companyName", "designation",
   "email", "phone", "address", "country", "state", "district", "pincode",
+  "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
 ];
 // Columns actually shown/searchable in the buyers table (in this order).
 const VISITOR_LIST_COLUMNS = [
@@ -90,6 +107,11 @@ const VISITOR_LIST_COLUMNS = [
   { key: "state", label: "State" },
   { key: "district", label: "District" },
   { key: "pincode", label: "Pincode" },
+  { key: "natureOfBusiness", label: "Nature of Business" },
+  { key: "annualTurnover", label: "Annual Turnover" },
+  { key: "knownThrough", label: "Known Through" },
+  { key: "onlineSeller", label: "Online Seller" },
+  { key: "productsOfInterest", label: "Products of Interest" },
   { key: "createdAt", label: "Registered On" },
 ];
 
@@ -384,7 +406,11 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM ${buyers_TABLE} ${where} ORDER BY ${COL.createdAt} DESC`, values);
     const rows = result.rows.map(mapVisitorRow);
-    const headers = [...VISITOR_LIST_COLUMNS.map((c) => c.key), "status", "attended"];
+    const headers = [
+      ...VISITOR_LIST_COLUMNS.map((c) => c.key),
+      "status", "attended", "attendedAt",
+      "printCount", "scanCount", "lastScannedAt", "badgeDownloadCount",
+    ];
     const escape = (val) => {
       if (val === null || val === undefined) return "";
       return `"${String(val).replace(/"/g, '""')}"`;

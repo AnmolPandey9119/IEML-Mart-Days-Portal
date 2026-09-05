@@ -147,7 +147,18 @@ const VISITOR_FIELD_LABELS = {
   buyerType: "Buyer Type", email: "Email", phone: "Phone", address: "Address",
   country: "Country", state: "State", district: "City / District", pincode: "Pincode",
   createdAt: "Registered On", status: "Status", attended: "Checked In",
+  natureOfBusiness: "Nature of Business", annualTurnover: "Annual Turnover",
+  knownThrough: "Known Through", onlineSeller: "Online Seller (E-commerce)",
+  productsOfInterest: "Products of Interest",
+  printCount: "Badge Print Count", scanCount: "Badge Scan Count",
+  lastScannedAt: "Last Scanned At", badgeDownloadCount: "Badge Download Count",
 };
+const KNOWN_THROUGH_OPTIONS = [
+  "Advertisement", "Phone call from organiser", "Email from organiser",
+  "IHGF Delhi Fair website", "Invitation by Exhibitors", "Social media",
+  "Invitation from India Representative / buying agent in India",
+];
+const ONLINE_SELLER_OPTIONS = ["Yes", "No"];
 
 function visitorFilterParams() {
   const params = new URLSearchParams();
@@ -470,10 +481,16 @@ function openVisitorModal(row, mode) {
   if (mode === "view") {
     title.textContent = "Buyer Details";
     saveBtn.style.display = "none";
-    const viewKeys = ["urn", "fullName", "companyName", "designation", "buyerType", "email", "phone", "address", "country", "state", "district", "pincode", "createdAt", "status", "attended"];
+    const viewKeys = [
+      "urn", "fullName", "companyName", "designation", "buyerType", "email", "phone",
+      "address", "country", "state", "district", "pincode",
+      "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
+      "createdAt", "status", "attended",
+      "printCount", "scanCount", "lastScannedAt", "badgeDownloadCount",
+    ];
     body.innerHTML = `<div class="view-grid">${viewKeys.map((k) => {
       let val = row[k];
-      if (k === "createdAt") val = fmtDate(val);
+      if (k === "createdAt" || k === "lastScannedAt") val = fmtDate(val);
       if (k === "attended") val = val ? "Yes" : "No";
       return `<div class="view-item"><label>${esc(VISITOR_FIELD_LABELS[k])}</label><div>${esc(val) || "—"}</div></div>`;
     }).join("")}</div>`;
@@ -503,11 +520,30 @@ function openVisitorModal(row, mode) {
         <div class="field"><label>State</label><div id="evStateWrap">${renderStateFieldHTML(row.country, row.state)}</div></div>
         <div class="field"><label>City / District</label><div id="evDistrictWrap">${renderDistrictFieldHTML(row.state, row.district)}</div></div>
         <div class="field"><label>Pincode</label><input type="text" id="evPincode" value="${esc(row.pincode)}" /></div>
+        <div class="field"><label>Nature of Business</label><input type="text" id="evNatureOfBusiness" value="${esc(row.natureOfBusiness)}" /></div>
+        <div class="field"><label>Annual Turnover</label><input type="text" id="evAnnualTurnover" value="${esc(row.annualTurnover)}" /></div>
+        <div class="field"><label>Known Through</label>${selectWithFallbackHTML("evKnownThrough", KNOWN_THROUGH_OPTIONS, row.knownThrough, "Select")}</div>
+        <div class="field"><label>Online Seller</label>${selectWithFallbackHTML("evOnlineSeller", ONLINE_SELLER_OPTIONS, row.onlineSeller, "Select")}</div>
+        <div class="field full"><label>Products of Interest <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label><input type="text" id="evProductsOfInterest" value="${esc(row.productsOfInterest)}" /></div>
       </div>
     `;
     wireGeoCascade();
   }
   backdrop.classList.add("show");
+}
+
+// Builds a <select> with the given options, pre-selected to currentValue.
+// If currentValue doesn't match any option (older/odd data), it's kept as
+// an extra selected option instead of being silently dropped.
+function selectWithFallbackHTML(id, options, currentValue, placeholderLabel) {
+  const known = options.includes(currentValue);
+  return `
+    <select id="${id}">
+      <option value="" ${!currentValue ? "selected" : ""}>${esc(placeholderLabel)}</option>
+      ${options.map((o) => `<option value="${esc(o)}" ${currentValue === o ? "selected" : ""}>${esc(o)}</option>`).join("")}
+      ${currentValue && !known ? `<option value="${esc(currentValue)}" selected>${esc(currentValue)} (existing value)</option>` : ""}
+    </select>
+  `;
 }
 
 // ---- Cascading Country → State → District for the edit modal ----
@@ -584,6 +620,11 @@ document.getElementById("visitorModalSave").addEventListener("click", async () =
     state: document.getElementById("evState").value.trim(),
     country: document.getElementById("evCountry").value.trim(),
     pincode: document.getElementById("evPincode").value.trim(),
+    natureOfBusiness: document.getElementById("evNatureOfBusiness").value.trim(),
+    annualTurnover: document.getElementById("evAnnualTurnover").value.trim(),
+    knownThrough: document.getElementById("evKnownThrough").value,
+    onlineSeller: document.getElementById("evOnlineSeller").value,
+    productsOfInterest: document.getElementById("evProductsOfInterest").value.trim(),
   };
   if (!body.fullName) {
     errorEl.textContent = "Full name is required.";
