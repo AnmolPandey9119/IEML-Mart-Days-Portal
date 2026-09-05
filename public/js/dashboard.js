@@ -103,12 +103,12 @@ async function renderOverview() {
   pageTitle.textContent = "Overview";
   viewArea.innerHTML = `<div class="loading-state">Loading…</div>`;
   try {
-    const [buyersRes, ownersRes] = await Promise.all([
+    const [buyersRes, ownersRes, analytics, printSummary] = await Promise.all([
       fetch("/api/buyers?pageSize=1").then((r) => r.json()),
       fetch("/api/mart-owners?pageSize=1").then((r) => r.json()),
+      fetch("/api/analytics/buyers").then((r) => r.json()),
+      fetch("/api/print-history/summary").then((r) => r.json()).catch(() => ({ totalPrints: 0, todayPrints: 0 })),
     ]);
-    const analytics = await fetch("/api/analytics/buyers").then((r) => r.json());
-    const printSummary = await fetch("/api/print-history/summary").then((r) => r.json()).catch(() => ({ totalPrints: 0, todayPrints: 0 }));
     viewArea.innerHTML = `
       <div class="stat-grid">
         <div class="stat-card"><div class="num">${buyersRes.total ?? 0}</div><div class="label">Total Registered Buyers</div></div>

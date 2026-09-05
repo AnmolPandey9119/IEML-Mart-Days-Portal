@@ -48,3 +48,10 @@ CREATE TABLE IF NOT EXISTS badge_print_log (
 );
 CREATE INDEX IF NOT EXISTS idx_badge_print_log_urn ON badge_print_log (urn);
 CREATE INDEX IF NOT EXISTS idx_badge_print_log_printed_at ON badge_print_log (printed_at);
+
+-- 4) Sort-column indexes — every Buyers/Mart Owners page load sorts by
+-- these columns (newest first). Without an index Postgres has to sort
+-- the whole table on every request; this makes it instant regardless of
+-- how many rows accumulate over the event.
+CREATE INDEX IF NOT EXISTS idx_mart_days_registered_at ON mart_days_registrations (registered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mart_owners_created_at ON mart_owners (created_at DESC);

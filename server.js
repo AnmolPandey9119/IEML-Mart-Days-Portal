@@ -2,11 +2,13 @@ require("dotenv").config();
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const compression = require("compression");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const pool = require("./db");
 
 const app = express();
+app.use(compression()); // gzip/br every response — HTML/CSS/JS/JSON compress ~70-80%
 const PORT = process.env.PORT || 4000;
 const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_NAME = "ieml_mart_token";
@@ -120,7 +122,19 @@ app.use(cookieParser());
 
 app.get("/", (req, res) => res.redirect("/login.html"));
 app.get("/api/branding", (req, res) => res.json(BRANDING));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders: (res, filePath) => {
+    // HTML must always be revalidated (so deploys show up immediately);
+    // CSS/JS/images are safe to cache harder since they aren't
+    // content-hashed — a short cache still cuts repeat-visit load time
+    // a lot without risking someone being stuck on a stale file for long.
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-cache");
+    } else {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    }
+  },
+}));
 
 // ---------------------------------------------------------------------
 // Auth — same secure pattern as the Bharat Packaging Expo portal:
@@ -299,14 +313,15 @@ app.get("/api/buyers", requireAuth, async (req, res) => {
   const { where, values } = buildVisitorWhere(req.query);
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM ${buyers_TABLE} ${where}`, values);
-    const total = parseInt(countResult.rows[0].count, 10);
-
     const dataValues = [...values, pageSize, offset];
     const dataResult = await pool.query(
-      `SELECT * FROM ${buyers_TABLE} ${where} ORDER BY ${COL.createdAt} DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      `SELECT *, COUNT(*) OVER() AS full_count
+       FROM ${buyers_TABLE} ${where}
+       ORDER BY ${COL.createdAt} DESC
+       LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       dataValues
     );
+    const total = dataResult.rows.length ? parseInt(dataResult.rows[0].full_count, 10) : 0;
 
     res.json({
       rows: dataResult.rows.map(mapVisitorRow),
@@ -510,14 +525,17 @@ app.get("/api/mart-owners", requireAuth, async (req, res) => {
   const { where, values } = buildOwnerWhere(req.query);
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM mart_owners ${where}`, values);
-    const total = parseInt(countResult.rows[0].count, 10);
     const dataValues = [...values, pageSize, offset];
     const dataResult = await pool.query(
-      `SELECT * FROM mart_owners ${where} ORDER BY created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      `SELECT *, COUNT(*) OVER() AS full_count
+       FROM mart_owners ${where}
+       ORDER BY created_at DESC
+       LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       dataValues
     );
-    res.json({ rows: dataResult.rows, total, page, pageSize });
+    const total = dataResult.rows.length ? parseInt(dataResult.rows[0].full_count, 10) : 0;
+    const rows = dataResult.rows.map(({ full_count, ...row }) => row);
+    res.json({ rows, total, page, pageSize });
   } catch (err) {
     console.error("list mart_owners failed:", err.message);
     res.status(500).json({ error: "Could not load mart owners.", detail: err.message });
@@ -652,12 +670,11 @@ app.get("/api/print-history", requireAuth, async (req, res) => {
   const values = day ? [day] : [];
 
   try {
-    const countResult = await pool.query(`SELECT COUNT(*) FROM badge_print_log l ${where}`, values);
-    const total = parseInt(countResult.rows[0].count, 10);
     const dataValues = [...values, pageSize, offset];
     const dataResult = await pool.query(
       `SELECT l.id, l.urn, l.printed_at,
-              b.${COL.fullName} AS full_name, b.${COL.companyName} AS company_name
+              b.${COL.fullName} AS full_name, b.${COL.companyName} AS company_name,
+              COUNT(*) OVER() AS full_count
        FROM badge_print_log l
        LEFT JOIN ${buyers_TABLE} b ON b.${COL.urn} = l.urn
        ${where}
@@ -665,7 +682,9 @@ app.get("/api/print-history", requireAuth, async (req, res) => {
        LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       dataValues
     );
-    res.json({ rows: dataResult.rows, total, page, pageSize });
+    const total = dataResult.rows.length ? parseInt(dataResult.rows[0].full_count, 10) : 0;
+    const rows = dataResult.rows.map(({ full_count, ...row }) => row);
+    res.json({ rows, total, page, pageSize });
   } catch (err) {
     console.error("list print-history failed:", err.message);
     res.status(500).json({ error: "Could not load print history.", detail: err.message });
