@@ -621,45 +621,16 @@ app.delete("/api/mart-owners/:id", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/buyers/:id/print — the "Print Badge" action. Increments
-// print_count, auto-checks the buyer in (attended = true) but never
-// overwrites an existing attended_at, and logs the event to
-// badge_print_log for the day-wise history/analytics view. Uses a
-// transaction so the counter and the log entry never drift apart.
-app.post("/api/buyers/:id/print", requireAuth, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const updateResult = await client.query(
-      `UPDATE ${buyers_TABLE}
-       SET ${COL.printCount} = COALESCE(${COL.printCount}, 0) + 1,
-           ${COL.attended} = TRUE,
-           ${COL.attendedAt} = COALESCE(${COL.attendedAt}, now())
-       WHERE ${COL.id} = $1
-       RETURNING *`,
-      [req.params.id]
-    );
-    if (updateResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Buyer not found." });
-    }
-    await client.query(`INSERT INTO badge_print_log (urn) VALUES ($1)`, [req.params.id]);
-    await client.query("COMMIT");
-    res.json({ success: true, row: mapVisitorRow(updateResult.rows[0]) });
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
-    console.error("print badge failed:", err.message);
-    res.status(500).json({ error: "Could not record badge print.", detail: err.message });
-  } finally {
-    client.release();
-  }
-});
-
 // ---------------------------------------------------------------------
-// Print history — audit trail of every "Print Badge" click, day-wise
-// counts for the analytics chart, and a "Clear History" action. Clearing
-// only wipes this log table; it never touches print_count/attended on
-// the buyer rows themselves — those stay as the buyer's own record.
+// Print history — audit trail of every badge print. Printing itself is
+// NOT done from this portal — it happens at the badge kiosk
+// (ieml-badgedesk.vercel.app), which writes print_count directly to
+// mart_days_registrations. A database trigger (see migrations/schema.sql)
+// watches for print_count increasing, regardless of which system caused
+// it, and both auto-checks the buyer in and logs the event here — so
+// this table stays accurate no matter where a print happens.
+// Clearing history only wipes this log table; it never touches
+// print_count/attended on the buyer rows themselves.
 // ---------------------------------------------------------------------
 app.get("/api/print-history", requireAuth, async (req, res) => {
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);

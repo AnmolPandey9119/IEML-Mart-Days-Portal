@@ -361,7 +361,6 @@ async function loadbuyers() {
                   <div class="actions-cell">
                     <button class="action-btn view" title="View" data-view="${esc(row.id)}">👁</button>
                     <button class="action-btn edit" title="Edit" data-edit="${esc(row.id)}">✏️</button>
-                    <button class="action-btn print" title="Print Badge (auto checks-in)" data-print="${esc(row.id)}">🖨️</button>
                     <button class="action-btn approve" title="Approve" data-approve="${esc(row.id)}">✔️</button>
                     <button class="action-btn reject" title="Reject" data-reject="${esc(row.id)}">✖️</button>
                     <button class="action-btn delete" title="Delete" data-delete="${esc(row.id)}">🗑️</button>
@@ -417,23 +416,6 @@ async function loadbuyers() {
         btn.addEventListener("click", () => {
           const row = buyersState.rows.find((r) => String(r.id) === btn.dataset.edit);
           if (row) openVisitorModal(row, "edit");
-        });
-      });
-      area.querySelectorAll("[data-print]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const row = buyersState.rows.find((r) => String(r.id) === btn.dataset.print);
-          const name = row ? row.fullName : "this buyer";
-          if (!confirm(`Print badge for ${name}? This will also mark them as checked-in.`)) return;
-          btn.disabled = true;
-          try {
-            const r = await fetch(`/api/buyers/${btn.dataset.print}/print`, { method: "POST" });
-            const d = await r.json();
-            if (!r.ok) throw new Error(d.error || "Could not print badge.");
-            loadbuyers();
-          } catch (err) {
-            alert(err.message);
-            btn.disabled = false;
-          }
         });
       });
       area.querySelectorAll("[data-approve]").forEach((btn) => {
@@ -921,10 +903,12 @@ async function renderAnalytics() {
 }
 
 // ---------------------------------------------------------------------
-// Print History — audit trail of every "Print Badge" click, with
-// day-wise counts (bar chart, same pattern as Analytics) and a
-// "Clear History" action. Clearing this log never touches any buyer's
-// own print_count or checked-in status — it's purely the audit trail.
+// Print History — audit trail of every badge print. Printing itself
+// happens at the badge kiosk (ieml-badgedesk.vercel.app), never from
+// this portal — a database trigger logs each print here automatically
+// as soon as badgedesk updates print_count, so this page is purely a
+// read-only view (with a "Clear History" action for the audit log only;
+// it never touches any buyer's own print_count or checked-in status).
 // ---------------------------------------------------------------------
 const printHistoryState = { page: 1, pageSize: 25 };
 

@@ -304,7 +304,6 @@ tbody tr:hover { background: #fffafc; }
 .action-btn.approve { background: var(--success-bg); color: var(--success); }
 .action-btn.reject { background: #fff1e0; color: #b3690a; }
 .action-btn.delete { background: var(--error-bg); color: var(--error); }
-.action-btn.print { background: #eaf6f0; color: #157347; }
 .action-btn:hover { filter: brightness(0.95); }
 .action-btn:disabled { opacity: 0.5; }
 

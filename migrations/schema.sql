@@ -38,9 +38,11 @@ CREATE TABLE IF NOT EXISTS mart_owners (
 -- rows you've already entered.
 ALTER TABLE mart_owners ADD COLUMN IF NOT EXISTS urn TEXT;
 
--- 3) Badge print history — one row per "Print Badge" click from this
--- portal. ON DELETE CASCADE means if a buyer registration is ever
--- deleted, their print log rows go with it (no orphaned history).
+-- 3) Badge print history — one row per badge print, whoever/whatever
+-- performs the print (the badgedesk kiosk at ieml-badgedesk.vercel.app
+-- writes print_count directly to mart_days_registrations; this portal
+-- never prints anything itself). ON DELETE CASCADE means if a buyer
+-- registration is ever deleted, their print log rows go with it.
 CREATE TABLE IF NOT EXISTS badge_print_log (
   id SERIAL PRIMARY KEY,
   urn TEXT NOT NULL REFERENCES mart_days_registrations(urn) ON DELETE CASCADE,
@@ -48,6 +50,50 @@ CREATE TABLE IF NOT EXISTS badge_print_log (
 );
 CREATE INDEX IF NOT EXISTS idx_badge_print_log_urn ON badge_print_log (urn);
 CREATE INDEX IF NOT EXISTS idx_badge_print_log_printed_at ON badge_print_log (printed_at);
+
+-- 3b) Two triggers make the history + auto-check-in work automatically,
+-- no matter which application increments print_count (badgedesk today,
+-- possibly something else later — this portal included, though it
+-- currently has no print action of its own).
+--
+-- Trigger A (BEFORE UPDATE): whenever print_count goes up, force
+-- attended = true. attended_at is only set the FIRST time (COALESCE
+-- keeps an existing check-in time rather than overwriting it on a
+-- reprint) — this can still be unchecked manually from the portal.
+CREATE OR REPLACE FUNCTION trg_badge_print_autocheckin() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.print_count > OLD.print_count THEN
+    NEW.attended := TRUE;
+    NEW.attended_at := COALESCE(OLD.attended_at, now());
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS badge_print_autocheckin ON mart_days_registrations;
+CREATE TRIGGER badge_print_autocheckin
+  BEFORE UPDATE ON mart_days_registrations
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_badge_print_autocheckin();
+
+-- Trigger B (AFTER UPDATE): whenever print_count goes up, log the event
+-- so the portal's Print History page has a day-wise, per-buyer trail —
+-- this fires whether badgedesk, this portal, or a future admin tool is
+-- the one that changed the count.
+CREATE OR REPLACE FUNCTION trg_badge_print_log() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.print_count > OLD.print_count THEN
+    INSERT INTO badge_print_log (urn) VALUES (NEW.urn);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS badge_print_log_insert ON mart_days_registrations;
+CREATE TRIGGER badge_print_log_insert
+  AFTER UPDATE ON mart_days_registrations
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_badge_print_log();
 
 -- 4) Sort-column indexes — every Buyers/Mart Owners page load sorts by
 -- these columns (newest first). Without an index Postgres has to sort
