@@ -130,15 +130,15 @@ async function renderOverview() {
     ]);
     viewArea.innerHTML = `
       <div class="stat-grid">
-        <div class="stat-card"><div class="num">${buyersRes.total ?? 0}</div><div class="label">Total Registered Buyers</div></div>
-        <div class="stat-card"><div class="num">${analytics.attended ?? 0}</div><div class="label">Checked In at Mart</div></div>
-        <div class="stat-card"><div class="num">${analytics.notAttended ?? 0}</div><div class="label">Yet to Arrive</div></div>
-        <div class="stat-card"><div class="num">${ownersRes.total ?? 0}</div><div class="label">Mart Owners on File</div></div>
-        <div class="stat-card"><div class="num">${printSummary.totalPrints ?? 0}</div><div class="label">Total Badges Printed</div></div>
-        <div class="stat-card"><div class="num">${printSummary.todayPrints ?? 0}</div><div class="label">Printed Today</div></div>
+        <div class="stat-card"><div class="stat-card-icon">👥</div><div class="num">${buyersRes.total ?? 0}</div><div class="label">Total Registered Buyers</div></div>
+        <div class="stat-card"><div class="stat-card-icon">✅</div><div class="num">${analytics.attended ?? 0}</div><div class="label">Checked In at Mart</div></div>
+        <div class="stat-card"><div class="stat-card-icon">⏳</div><div class="num">${analytics.notAttended ?? 0}</div><div class="label">Yet to Arrive</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🏬</div><div class="num">${ownersRes.total ?? 0}</div><div class="label">Mart Owners on File</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🖨️</div><div class="num">${printSummary.totalPrints ?? 0}</div><div class="label">Total Badges Printed</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📅</div><div class="num">${printSummary.todayPrints ?? 0}</div><div class="label">Printed Today</div></div>
       </div>
       <div class="panel">
-        <h3>Quick links</h3>
+        <h3>🔗 Quick links</h3>
         <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">
           Public buyer registration form: <a href="${esc(branding.registrationUrl)}" target="_blank" rel="noopener">${esc(branding.registrationUrl)}</a>
         </p>
@@ -964,53 +964,53 @@ async function renderAnalytics() {
 
     viewArea.innerHTML = `
       <div class="stat-grid">
-        <div class="stat-card"><div class="num">${data.total}</div><div class="label">Total buyers</div></div>
-        <div class="stat-card"><div class="num">${data.attended}</div><div class="label">Checked In</div></div>
-        <div class="stat-card"><div class="num">${data.notAttended}</div><div class="label">Yet to Arrive</div></div>
-        <div class="stat-card"><div class="num">${turnoutPct}%</div><div class="label">Turnout So Far</div></div>
-        <div class="stat-card"><div class="num">${approved ? approved.count : 0}</div><div class="label">Approved</div></div>
-        <div class="stat-card"><div class="num">${rejected ? rejected.count : 0}</div><div class="label">Rejected</div></div>
+        <div class="stat-card"><div class="stat-card-icon">👥</div><div class="num">${data.total}</div><div class="label">Total buyers</div></div>
+        <div class="stat-card"><div class="stat-card-icon">✅</div><div class="num">${data.attended}</div><div class="label">Checked In</div></div>
+        <div class="stat-card"><div class="stat-card-icon">⏳</div><div class="num">${data.notAttended}</div><div class="label">Yet to Arrive</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📈</div><div class="num">${turnoutPct}%</div><div class="label">Turnout So Far</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🟢</div><div class="num">${approved ? approved.count : 0}</div><div class="label">Approved</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🔴</div><div class="num">${rejected ? rejected.count : 0}</div><div class="label">Rejected</div></div>
       </div>
 
       <div class="charts-grid">
         <div class="panel chart-card">
-          <h3>Check-in Progress</h3>
+          <h3>🎯 Check-in Progress</h3>
           ${data.total ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkCheckin"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
-          <h3>Registration Status</h3>
+          <h3>📋 Registration Status</h3>
           ${byStatus.length ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkStatus"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card chart-card-wide">
-          <h3>Registrations Over Time</h3>
+          <h3>📈 Registrations Over Time</h3>
           ${data.trend.length ? `<div class="chart-wrap"><canvas id="chkTrend"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
-          <h3>By Buyer Type</h3>
+          <h3>🏷️ By Buyer Type</h3>
           ${data.byBuyerType.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byBuyerType.length * 42)}px"><canvas id="chkBuyerType"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
-          <h3>Top Countries</h3>
+          <h3>🌍 Top Countries</h3>
           ${data.byCountry.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byCountry.length * 32)}px"><canvas id="chkCountry"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
-          <h3>Top States</h3>
+          <h3>📍 Top States</h3>
           ${data.byState && data.byState.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byState.length * 32)}px"><canvas id="chkState"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
-          <h3>How Buyers Heard About Us</h3>
+          <h3>📣 How Buyers Heard About Us</h3>
           ${data.byKnownThrough && data.byKnownThrough.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byKnownThrough.length * 32)}px"><canvas id="chkKnownThrough"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
@@ -1082,12 +1082,12 @@ async function renderPrintHistory() {
 
     viewArea.innerHTML = `
       <div class="stat-grid">
-        <div class="stat-card"><div class="num">${summary.totalPrints}</div><div class="label">Total Badges Printed</div></div>
-        <div class="stat-card"><div class="num">${summary.todayPrints}</div><div class="label">Printed Today</div></div>
+        <div class="stat-card"><div class="stat-card-icon">🖨️</div><div class="num">${summary.totalPrints}</div><div class="label">Total Badges Printed</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📅</div><div class="num">${summary.todayPrints}</div><div class="label">Printed Today</div></div>
       </div>
 
       <div class="panel">
-        <h3>Prints per day (last 30 days with activity)</h3>
+        <h3>📊 Prints per day (last 30 days with activity)</h3>
         ${summary.byDay.length ? summary.byDay.map((r) => `
           <div class="bar-row">
             <span class="bar-label">${esc(r.day)}</span>
@@ -1097,7 +1097,7 @@ async function renderPrintHistory() {
       </div>
 
       <div class="panel">
-        <h3>Recent print events</h3>
+        <h3>🧾 Recent print events</h3>
         ${historyRes.rows.length ? `
           <div class="table-scroll">
             <table>

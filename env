@@ -1,0 +1,28 @@
+# Copy this to .env for local development.
+# On Render, add these same keys under Settings → Environment (not this file).
+
+# SAME Neon connection string used by ieml-martdays-registration.vercel.app
+DATABASE_URL=postgresql://neondb_owner:npg_akSZNFwQ4B5R@ep-delicate-frost-ae2qtixx-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+# Long random string — used to sign login sessions. Generate one with:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET=335aadd5a39221eae693431901b9c7604cd41cbfec1cf0c3b9b37ebee59563a5
+
+# Login credentials for THIS admin portal (pick your own)
+ADMIN_USERNAME=Admin
+ADMIN_PASSWORD=Admin_portal123
+
+# Optional — table name, only if your visitors table isn't called "visitors"
+# VISITORS_TABLE=visitors
+
+# Optional branding overrides (defaults already match IEML Mart Sourcing Days)
+# EVENT_NAME=IEML Mart Sourcing Days
+# EVENT_TAGLINE=Source Better. Discover More.
+# EVENT_DATE_RANGE=16–17 Sept 2026
+# EVENT_VENUE=India Expo Centre & Mart, Greater Noida, UP
+# REGISTRATION_URL=https://ieml-martdays-registration.vercel.app/
+
+NODE_ENV=development
+PORT=4000
+
+EVENT_EDITION=29th Edition · Mega Mart
