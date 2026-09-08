@@ -93,13 +93,17 @@
      flex: 1 1 44%;
      min-width: 280px;
      position: relative;
-     background: var(--brand-gradient);
      color: #fff;
      display: flex;
      align-items: center;
      justify-content: center;
      padding: 40px;
      overflow: hidden;
+     background-image:
+       linear-gradient(165deg, rgba(163, 15, 87, 0.90) 0%, rgba(98, 10, 56, 0.80) 100%),
+       url("/assets/expo-mart-gate.png");
+     background-size: cover;
+     background-position: center 35%;
    }
    .login-brand-panel::before {
      content: "";
@@ -186,47 +190,74 @@
    .sidebar-brand {
      position: relative;
      overflow: hidden;
-     background: var(--brand-gradient);
      color: #fff;
-     border-radius: 18px;
-     padding: 22px 18px 20px;
+     border-radius: 20px;
+     padding: 26px 20px 22px;
      margin-bottom: 22px;
-     box-shadow: 0 14px 34px rgba(163, 0, 59, 0.3);
+     box-shadow: 0 16px 38px rgba(163, 0, 59, 0.32);
+     /* Real IEML gate photo, same treatment as the badge-download
+        identity panel: a tinted brand gradient laid over the photo so
+        text stays readable while the photo itself stays recognisable. */
+     background-image:
+       linear-gradient(165deg, rgba(163, 15, 87, 0.90) 0%, rgba(98, 10, 56, 0.80) 100%),
+       url("/assets/expo-mart-gate.png");
+     background-size: cover;
+     background-position: center 35%;
    }
    .sidebar-brand::before {
      content: "";
      position: absolute; inset: 0;
-     background-image: radial-gradient(rgba(255,255,255,0.14) 1.4px, transparent 1.4px);
-     background-size: 16px 16px;
-     opacity: 0.6;
+     background-image: radial-gradient(rgba(255,255,255,0.16) 1.6px, transparent 1.6px);
+     background-size: 17px 17px;
+     -webkit-mask-image: radial-gradient(circle at top right, #000 0%, transparent 78%);
+     mask-image: radial-gradient(circle at top right, #000 0%, transparent 78%);
      pointer-events: none;
    }
    .sidebar-brand::after {
      content: "";
      position: absolute;
-     width: 180px; height: 180px;
+     width: 200px; height: 200px;
      border-radius: 50%;
-     background: radial-gradient(circle, rgba(244,185,66,0.3), transparent 70%);
-     bottom: -80px; right: -60px;
+     background: radial-gradient(circle, rgba(244,185,66,0.38), transparent 70%);
+     bottom: -90px; right: -70px;
      pointer-events: none;
    }
    .sidebar-brand > * { position: relative; }
    .sidebar-brand-mark {
-     width: 54px; height: 54px;
+     width: 56px; height: 56px;
      display: flex; align-items: center; justify-content: center;
-     margin-bottom: 14px;
-     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.18));
+     margin-bottom: 16px;
+     filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
    }
    .sidebar-brand-mark img { width: 100%; height: 100%; object-fit: contain; }
-   .sidebar-brand-org { font-size: 11.5px; font-weight: 600; opacity: 0.88; letter-spacing: 0.2px; }
-   .sidebar-brand-edition {
-     display: inline-block; margin-top: 8px; padding: 3px 11px; border-radius: 999px;
-     background: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: #5a3600; font-size: 11px; font-weight: 800;
+   .sidebar-brand-org {
+     font-size: 11px; font-weight: 700; opacity: 0.92; letter-spacing: 0.09em;
+     text-transform: uppercase; font-family: var(--font-display);
+     text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
    }
-   .sidebar-brand-title { font-size: 25px; font-weight: 800; line-height: 1.2; margin-top: 10px; font-family: var(--font-display); }
-   .sidebar-brand-tag { font-size: 12.5px; opacity: 0.92; margin-top: 6px; line-height: 1.4; }
-   .sidebar-brand-divider { height: 1px; background: rgba(255,255,255,0.25); margin: 16px 0 12px; }
-   .sidebar-brand-row { display: flex; align-items: center; gap: 7px; font-size: 12px; opacity: 0.92; margin-top: 6px; line-height: 1.4; }
+   .sidebar-brand-edition {
+     display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px;
+     background: linear-gradient(90deg, var(--gold-soft) 0%, var(--gold) 100%); color: #5a3600; font-size: 11px; font-weight: 800;
+     letter-spacing: 0.02em;
+   }
+   .sidebar-brand-title {
+     font-size: 27px; font-weight: 800; line-height: 1.15; margin-top: 12px; font-family: var(--font-display);
+     text-shadow: 0 2px 10px rgba(98, 10, 56, 0.45);
+   }
+   .sidebar-brand-tag { font-size: 12.5px; opacity: 0.94; margin-top: 7px; line-height: 1.5; text-shadow: 0 1px 6px rgba(98, 10, 56, 0.35); }
+   .sidebar-brand-divider { height: 1px; background: rgba(255,255,255,0.22); margin: 18px 0 14px; }
+   .sidebar-brand-row {
+     display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 500; margin-top: 8px; line-height: 1.4;
+     background: rgba(255,255,255,0.12);
+     border: 1px solid rgba(255,255,255,0.22);
+     border-radius: 999px;
+     padding: 7px 13px;
+     -webkit-backdrop-filter: blur(3px);
+     backdrop-filter: blur(3px);
+     width: fit-content;
+     max-width: 100%;
+   }
+   .sidebar-brand-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
    
    nav.nav-list { display: flex; flex-direction: column; gap: 3px; flex: 1; }
    .nav-item {
@@ -375,6 +406,61 @@
    .bar-row .bar-count { width: 34px; text-align: right; font-weight: 700; color: var(--pink-dark); }
    
    /* ---------- Analytics charts ---------- */
+   /* Hero snapshot band — a single glanceable ring + sentence above the
+      stat grid, so the very first thing anyone sees on Analytics is one
+      plain-English read of where things stand, before the grid of raw
+      numbers and the seven charts below it. */
+   .analytics-hero {
+     display: flex;
+     align-items: center;
+     gap: 28px;
+     background: var(--card);
+     border: 1px solid var(--border);
+     border-radius: var(--radius-lg);
+     padding: 24px 28px;
+     margin-bottom: 22px;
+     box-shadow: var(--shadow);
+     flex-wrap: wrap;
+     position: relative;
+     overflow: hidden;
+   }
+   .analytics-hero::before {
+     content: "";
+     position: absolute;
+     width: 320px; height: 320px;
+     border-radius: 50%;
+     background: radial-gradient(circle, var(--pink-bg), transparent 70%);
+     top: -160px; right: -120px;
+     pointer-events: none;
+   }
+   .hero-ring {
+     position: relative;
+     width: 128px; height: 128px;
+     flex: 0 0 auto;
+   }
+   .hero-ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+   .hero-ring-svg .ring-track { fill: none; stroke: var(--pink-soft); stroke-width: 11; }
+   .hero-ring-svg .ring-fill {
+     fill: none; stroke: url(#ringGradient); stroke-width: 11; stroke-linecap: round;
+     stroke-dasharray: calc(var(--pct, 0) * 3.267) 1000;
+     transition: stroke-dasharray 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+   }
+   .hero-ring-center {
+     position: absolute; inset: 0;
+     display: flex; flex-direction: column; align-items: center; justify-content: center;
+   }
+   .hero-ring-pct { font-family: var(--font-display); font-size: 25px; font-weight: 800; color: var(--pink-dark); line-height: 1; }
+   .hero-ring-caption { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 3px; }
+   .hero-summary { flex: 1 1 260px; min-width: 220px; position: relative; }
+   .hero-summary-title {
+     margin: 0 0 6px; font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+     letter-spacing: 0.07em; color: var(--pink); font-family: var(--font-display);
+   }
+   .hero-summary-text { margin: 0; font-size: 16px; line-height: 1.6; color: var(--ink); max-width: 56ch; }
+   .hero-summary-text strong { font-family: var(--font-display); color: var(--pink-dark); }
+   
+   .chart-card-sub { margin: -8px 0 14px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+   
    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
    .chart-card { margin-bottom: 0; display: flex; flex-direction: column; position: relative; }
    .chart-card::before {
@@ -435,15 +521,21 @@
    }
    .clear-all-btn:hover { text-decoration: underline; }
    
-   /* ---------- Table ---------- */
+   /* ---------- Table ----------
+      Soft inset dividers between columns (not a heavy bordered grid) —
+      drawn with box-shadow so header and body lines stay perfectly
+      aligned without doubling up at cell edges. */
    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
    table { width: 100%; border-collapse: collapse; font-size: 13px; }
    thead th {
      text-align: left; padding: 12px 14px; background: var(--pink-soft); color: #6b3a4c;
      font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.4px;
      white-space: nowrap; position: sticky; top: 0;
+     box-shadow: inset -1px 0 0 rgba(163, 0, 59, 0.1);
    }
-   tbody td { padding: 11px 14px; border-top: 1px solid var(--border); white-space: nowrap; }
+   thead th:last-child { box-shadow: none; }
+   tbody td { padding: 11px 14px; border-top: 1px solid var(--border); white-space: nowrap; box-shadow: inset -1px 0 0 var(--border); }
+   tbody td:last-child { box-shadow: none; }
    tbody tr { transition: background 0.12s; }
    tbody tr:hover { background: #fffafc; }
    .table-scroll { overflow-x: auto; max-width: 100%; }
@@ -589,6 +681,11 @@
      .stat-card { padding: 14px; }
      .stat-card .num { font-size: 23px; }
      .stat-card .label { font-size: 12px; }
+   
+     .analytics-hero { padding: 18px; gap: 16px; }
+     .hero-ring { width: 92px; height: 92px; }
+     .hero-ring-pct { font-size: 19px; }
+     .hero-summary-text { font-size: 14px; }
    
      /* charts stack to a single column and shrink a bit on small screens */
      .charts-grid { grid-template-columns: 1fr; gap: 14px; }

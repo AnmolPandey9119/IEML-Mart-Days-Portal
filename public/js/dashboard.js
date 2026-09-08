@@ -963,6 +963,29 @@ async function renderAnalytics() {
     const cumulative = (data.trend || []).map((r) => (running += r.count));
 
     viewArea.innerHTML = `
+      <div class="analytics-hero">
+        <div class="hero-ring" style="--pct:${turnoutPct}">
+          <svg class="hero-ring-svg" viewBox="0 0 120 120">
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ff2d78"/>
+                <stop offset="100%" stop-color="#a3003b"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+            <circle class="ring-fill" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <div class="hero-ring-center">
+            <div class="hero-ring-pct">${turnoutPct}%</div>
+            <div class="hero-ring-caption">Turnout</div>
+          </div>
+        </div>
+        <div class="hero-summary">
+          <p class="hero-summary-title">Live Snapshot</p>
+          <p class="hero-summary-text"><strong>${data.attended}</strong> of <strong>${data.total}</strong> registered buyers have checked in so far${data.notAttended ? `, with <strong>${data.notAttended}</strong> yet to arrive` : ""}.</p>
+        </div>
+      </div>
+
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-card-icon">👥</div><div class="num">${data.total}</div><div class="label">Total buyers</div></div>
         <div class="stat-card"><div class="stat-card-icon">✅</div><div class="num">${data.attended}</div><div class="label">Checked In</div></div>
@@ -975,42 +998,49 @@ async function renderAnalytics() {
       <div class="charts-grid">
         <div class="panel chart-card">
           <h3>🎯 Check-in Progress</h3>
+          <p class="chart-card-sub">Share of registered buyers who have checked in at the venue.</p>
           ${data.total ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkCheckin"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
           <h3>📋 Registration Status</h3>
+          <p class="chart-card-sub">How many registrations are approved, rejected, or still pending.</p>
           ${byStatus.length ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkStatus"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card chart-card-wide">
           <h3>📈 Registrations Over Time</h3>
+          <p class="chart-card-sub">Daily sign-ups (solid line) against the running total (dashed line).</p>
           ${data.trend.length ? `<div class="chart-wrap"><canvas id="chkTrend"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
           <h3>🏷️ By Buyer Type</h3>
+          <p class="chart-card-sub">How registrations split across the three buyer categories.</p>
           ${data.byBuyerType.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byBuyerType.length * 42)}px"><canvas id="chkBuyerType"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
           <h3>🌍 Top Countries</h3>
+          <p class="chart-card-sub">Countries buyers are travelling from, most first.</p>
           ${data.byCountry.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byCountry.length * 32)}px"><canvas id="chkCountry"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
           <h3>📍 Top States</h3>
+          <p class="chart-card-sub">Indian states sending the most registered buyers.</p>
           ${data.byState && data.byState.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byState.length * 32)}px"><canvas id="chkState"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
 
         <div class="panel chart-card">
           <h3>📣 How Buyers Heard About Us</h3>
+          <p class="chart-card-sub">Which outreach channel brought each buyer to register.</p>
           ${data.byKnownThrough && data.byKnownThrough.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byKnownThrough.length * 32)}px"><canvas id="chkKnownThrough"></canvas></div>`
             : `<div class="empty-state">No data yet.</div>`}
         </div>
