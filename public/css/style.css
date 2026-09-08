@@ -289,7 +289,7 @@
       dot grid, gold eyebrow, gradient Fraunces headline, pill
       date chip, venue line, footer note pinned to the bottom.
       ========================================================== */
-   .app-shell { display: flex; height: 100vh; overflow: hidden; }
+   .app-shell { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
    .sidebar {
      width: 300px; flex: 0 0 300px;
@@ -696,14 +696,15 @@
      .hamburger-btn { display: flex; }
      .content-title { font-size: 17px; }
 
-     .app-shell { height: 100vh; }
+     .app-shell { height: 100vh; height: 100dvh; }
 
      .sidebar {
        position: fixed;
-       top: 0; left: 0; bottom: 0;
+       top: 0; left: 0;
        width: 78vw;
        max-width: 320px;
-       height: auto;
+       height: 100vh;
+       height: 100dvh;
        z-index: 200;
        transform: translateX(-100%);
        transition: transform 0.25s ease;
