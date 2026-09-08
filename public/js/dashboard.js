@@ -129,6 +129,15 @@ async function renderOverview() {
       fetch("/api/print-history/summary").then((r) => r.json()).catch(() => ({ totalPrints: 0, todayPrints: 0 })),
     ]);
     viewArea.innerHTML = `
+      <div class="overview-hero">
+        <div class="overview-hero-content">
+          <p class="overview-hero-eyebrow">India Exposition Mart Limited</p>
+          <h2 class="overview-hero-title">${esc(branding.eventName || "Mart Sourcing Days")}</h2>
+          <p class="overview-hero-sub">${esc(branding.dateRange || "")}${branding.dateRange && branding.venue ? " · " : ""}${esc(branding.venue || "")}</p>
+          <span class="overview-hero-badge">${esc(branding.edition || "Admin Overview")}</span>
+        </div>
+      </div>
+
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-card-icon">👥</div><div class="num">${buyersRes.total ?? 0}</div><div class="label">Total Registered Buyers</div></div>
         <div class="stat-card"><div class="stat-card-icon">✅</div><div class="num">${analytics.attended ?? 0}</div><div class="label">Checked In at Mart</div></div>
