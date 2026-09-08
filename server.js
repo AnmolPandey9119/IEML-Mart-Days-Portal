@@ -445,7 +445,7 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
 
 app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
   try {
-    const labels = ["total", "buyerType", "country", "trend", "attended"];
+    const labels = ["total", "buyerType", "country", "trend", "attended", "status", "state", "knownThrough"];
     const results = await Promise.allSettled([
       pool.query(`SELECT COUNT(*)::int AS count FROM ${buyers_TABLE}`),
       pool.query(
@@ -461,11 +461,23 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
          FROM ${buyers_TABLE} GROUP BY 1 ORDER BY 1`
       ),
       pool.query(`SELECT ${COL.attended} AS attended, COUNT(*)::int AS count FROM ${buyers_TABLE} GROUP BY 1`),
+      pool.query(
+        `SELECT COALESCE(NULLIF(TRIM(${COL.status}), ''), 'Registered') AS label, COUNT(*)::int AS count
+         FROM ${buyers_TABLE} GROUP BY 1 ORDER BY count DESC`
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(TRIM(${COL.state}), ''), 'Not specified') AS label, COUNT(*)::int AS count
+         FROM ${buyers_TABLE} GROUP BY 1 ORDER BY count DESC LIMIT 10`
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(TRIM(${COL.knownThrough}), ''), 'Not specified') AS label, COUNT(*)::int AS count
+         FROM ${buyers_TABLE} GROUP BY 1 ORDER BY count DESC LIMIT 8`
+      ),
     ]);
     results.forEach((r, i) => {
       if (r.status === "rejected") console.error(`visitor analytics "${labels[i]}" failed:`, r.reason && r.reason.message);
     });
-    const [total, buyerType, country, trend, attended] = results.map((r) =>
+    const [total, buyerType, country, trend, attended, status, state, knownThrough] = results.map((r) =>
       r.status === "fulfilled" ? r.value : { rows: [] }
     );
 
@@ -482,6 +494,9 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
       notAttended: notAttendedCount,
       byBuyerType: buyerType.rows,
       byCountry: country.rows,
+      byStatus: status.rows,
+      byState: state.rows,
+      byKnownThrough: knownThrough.rows,
       trend: trend.rows,
     });
   } catch (err) {
@@ -489,6 +504,7 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Could not load analytics.", detail: err.message });
   }
 });
+
 
 // ---------------------------------------------------------------------
 // Mart Owners — brand-new, blank list this portal owns. Fill it in

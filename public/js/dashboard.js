@@ -873,49 +873,173 @@ document.getElementById("ownerModalSave").addEventListener("click", async () => 
 // ---------------------------------------------------------------------
 // Analytics
 // ---------------------------------------------------------------------
+const STATUS_COLORS = { Registered: "#3a4fb0", Approved: "#1e8e5a", Rejected: "#c0392b" };
+const CHART_PALETTE = ["#d3004c", "#f4b942", "#3a4fb0", "#1e8e5a", "#b3690a", "#7a3fc9", "#2ba8b0", "#c0392b", "#8a8a3a", "#5a5a7a"];
+const chartInstances = {};
+
+function destroyChart(key) {
+  if (chartInstances[key]) {
+    chartInstances[key].destroy();
+    delete chartInstances[key];
+  }
+}
+
+function makeDoughnut(canvasId, labels, values, colors, key) {
+  destroyChart(key);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx || typeof Chart === "undefined") return;
+  chartInstances[key] = new Chart(ctx, {
+    type: "doughnut",
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: "#fff" }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: "68%",
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 14, font: { size: 12 } } } },
+    },
+  });
+}
+
+function makeHBar(canvasId, labels, values, key, color) {
+  destroyChart(key);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx || typeof Chart === "undefined") return;
+  chartInstances[key] = new Chart(ctx, {
+    type: "bar",
+    data: { labels, datasets: [{ data: values, backgroundColor: color || "#d3004c", borderRadius: 5, maxBarThickness: 22 }] },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f2e6ec" } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function makeLine(canvasId, labels, dailyValues, cumulativeValues, key) {
+  destroyChart(key);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx || typeof Chart === "undefined") return;
+  chartInstances[key] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Daily registrations", data: dailyValues, borderColor: "#d3004c",
+          backgroundColor: "rgba(211,0,76,0.12)", fill: true, tension: 0.3, pointRadius: 2, yAxisID: "y",
+        },
+        {
+          label: "Cumulative total", data: cumulativeValues, borderColor: "#3a4fb0",
+          backgroundColor: "transparent", borderDash: [5, 4], fill: false, tension: 0.25, pointRadius: 0, yAxisID: "y1",
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 14, font: { size: 12 } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f2e6ec" }, title: { display: true, text: "Per day" } },
+        y1: { beginAtZero: true, position: "right", grid: { display: false }, ticks: { precision: 0 }, title: { display: true, text: "Cumulative" } },
+      },
+    },
+  });
+}
+
 async function renderAnalytics() {
   pageTitle.textContent = "Analytics";
   viewArea.innerHTML = `<div class="loading-state">Loading analytics…</div>`;
   try {
     const data = await fetch("/api/analytics/buyers").then((r) => r.json());
-    const maxBuyer = Math.max(1, ...data.byBuyerType.map((r) => r.count));
-    const maxCountry = Math.max(1, ...data.byCountry.map((r) => r.count));
+    const turnoutPct = data.total ? Math.round((data.attended / data.total) * 100) : 0;
+    const byStatus = data.byStatus && data.byStatus.length ? data.byStatus : [];
+    const approved = byStatus.find((r) => r.label === "Approved");
+    const rejected = byStatus.find((r) => r.label === "Rejected");
+
+    // cumulative trend
+    let running = 0;
+    const cumulative = (data.trend || []).map((r) => (running += r.count));
 
     viewArea.innerHTML = `
       <div class="stat-grid">
         <div class="stat-card"><div class="num">${data.total}</div><div class="label">Total buyers</div></div>
         <div class="stat-card"><div class="num">${data.attended}</div><div class="label">Checked In</div></div>
-        <div class="stat-card"><div class="num">${data.notAttended}</div><div class="label">Not Yet Checked In</div></div>
-        <div class="stat-card"><div class="num">${data.total ? Math.round((data.attended / data.total) * 100) : 0}%</div><div class="label">Turnout So Far</div></div>
+        <div class="stat-card"><div class="num">${data.notAttended}</div><div class="label">Yet to Arrive</div></div>
+        <div class="stat-card"><div class="num">${turnoutPct}%</div><div class="label">Turnout So Far</div></div>
+        <div class="stat-card"><div class="num">${approved ? approved.count : 0}</div><div class="label">Approved</div></div>
+        <div class="stat-card"><div class="num">${rejected ? rejected.count : 0}</div><div class="label">Rejected</div></div>
       </div>
 
-      <div class="panel">
-        <h3>By Buyer Type</h3>
-        ${data.byBuyerType.length ? data.byBuyerType.map((r) => `
-          <div class="bar-row">
-            <span class="bar-label">${esc(r.label)}</span>
-            <span class="bar-track"><span class="bar-fill" style="width:${(r.count / maxBuyer) * 100}%"></span></span>
-            <span class="bar-count">${r.count}</span>
-          </div>`).join("") : `<div class="empty-state">No data yet.</div>`}
-      </div>
+      <div class="charts-grid">
+        <div class="panel chart-card">
+          <h3>Check-in Progress</h3>
+          ${data.total ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkCheckin"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
 
-      <div class="panel">
-        <h3>Top Countries</h3>
-        ${data.byCountry.length ? data.byCountry.map((r) => `
-          <div class="bar-row">
-            <span class="bar-label">${esc(r.label)}</span>
-            <span class="bar-track"><span class="bar-fill" style="width:${(r.count / maxCountry) * 100}%"></span></span>
-            <span class="bar-count">${r.count}</span>
-          </div>`).join("") : `<div class="empty-state">No data yet.</div>`}
-      </div>
+        <div class="panel chart-card">
+          <h3>Registration Status</h3>
+          ${byStatus.length ? `<div class="chart-wrap chart-wrap-sm"><canvas id="chkStatus"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
 
-      <div class="panel">
-        <h3>Registrations Over Time</h3>
-        ${data.trend.length ? `<div class="table-scroll"><table><thead><tr><th>Date</th><th>Registrations</th></tr></thead><tbody>
-          ${data.trend.map((r) => `<tr><td>${esc(r.label)}</td><td>${r.count}</td></tr>`).join("")}
-        </tbody></table></div>` : `<div class="empty-state">No data yet.</div>`}
+        <div class="panel chart-card chart-card-wide">
+          <h3>Registrations Over Time</h3>
+          ${data.trend.length ? `<div class="chart-wrap"><canvas id="chkTrend"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
+
+        <div class="panel chart-card">
+          <h3>By Buyer Type</h3>
+          ${data.byBuyerType.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byBuyerType.length * 42)}px"><canvas id="chkBuyerType"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
+
+        <div class="panel chart-card">
+          <h3>Top Countries</h3>
+          ${data.byCountry.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byCountry.length * 32)}px"><canvas id="chkCountry"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
+
+        <div class="panel chart-card">
+          <h3>Top States</h3>
+          ${data.byState && data.byState.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byState.length * 32)}px"><canvas id="chkState"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
+
+        <div class="panel chart-card">
+          <h3>How Buyers Heard About Us</h3>
+          ${data.byKnownThrough && data.byKnownThrough.length ? `<div class="chart-wrap" style="height:${Math.max(180, data.byKnownThrough.length * 32)}px"><canvas id="chkKnownThrough"></canvas></div>`
+            : `<div class="empty-state">No data yet.</div>`}
+        </div>
       </div>
     `;
+
+    if (data.total) {
+      makeDoughnut("chkCheckin", ["Checked In", "Yet to Arrive"], [data.attended, data.notAttended], ["#1e8e5a", "#fde6ee"], "checkin");
+    }
+    if (byStatus.length) {
+      makeDoughnut("chkStatus", byStatus.map((r) => r.label),
+        byStatus.map((r) => r.count),
+        byStatus.map((r) => STATUS_COLORS[r.label] || "#7a6b7d"), "status");
+    }
+    if (data.trend.length) {
+      makeLine("chkTrend", data.trend.map((r) => r.label), data.trend.map((r) => r.count), cumulative, "trend");
+    }
+    if (data.byBuyerType.length) {
+      makeHBar("chkBuyerType", data.byBuyerType.map((r) => r.label), data.byBuyerType.map((r) => r.count), "buyerType", "#d3004c");
+    }
+    if (data.byCountry.length) {
+      makeHBar("chkCountry", data.byCountry.map((r) => r.label), data.byCountry.map((r) => r.count), "country", "#3a4fb0");
+    }
+    if (data.byState && data.byState.length) {
+      makeHBar("chkState", data.byState.map((r) => r.label), data.byState.map((r) => r.count), "state", "#1e8e5a");
+    }
+    if (data.byKnownThrough && data.byKnownThrough.length) {
+      makeHBar("chkKnownThrough", data.byKnownThrough.map((r) => r.label), data.byKnownThrough.map((r) => r.count), "knownThrough", "#b3690a");
+    }
   } catch (err) {
     viewArea.innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
   }
