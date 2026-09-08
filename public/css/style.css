@@ -377,7 +377,7 @@
      text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
    }
 
-   .main { flex: 1; padding: 28px 32px; max-width: 100%; overflow-y: auto; overflow-x: hidden; height: 100%; }
+   .main { flex: 1; min-height: 0; padding: 28px 32px; max-width: 100%; overflow-y: auto; overflow-x: hidden; height: 100%; }
    .btn {
      padding: 9px 17px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
      background: #fff; font-weight: 600; font-size: 13px; color: var(--ink);
