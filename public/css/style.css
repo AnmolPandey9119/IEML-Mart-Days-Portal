@@ -182,21 +182,15 @@
    }
    
    /* ==========================================================
-      Fixed top header — brand strip + page title/actions only.
-      Sticky so it stays put while the page content scrolls.
-      Section tabs live inside the left identity panel (below).
+      In-content topbar — page title/actions/account menu, sitting
+      at the top of the main pane itself (no separate header strip
+      above the shell anymore; the left identity rail now carries
+      all the brand identity and runs the full viewport height).
       ========================================================== */
-   :root { --topbar-h: 64px; }
-
-   .app-topbar {
-     position: sticky; top: 0; z-index: 140;
-     background: #fff; border-bottom: 1px solid var(--border);
-     box-shadow: 0 2px 14px rgba(163, 0, 59, 0.06);
-   }
-   .topbar-row {
-     height: var(--topbar-h);
-     display: flex; align-items: center; gap: 16px;
-     padding: 0 22px;
+   .content-topbar {
+     display: flex; align-items: center; gap: 14px;
+     margin-bottom: 22px; padding-bottom: 16px;
+     border-bottom: 1px solid var(--border);
    }
    .hamburger-btn {
      width: 38px; height: 38px; flex: 0 0 38px;
@@ -205,16 +199,8 @@
    }
    .hamburger-btn span { display: block; width: 18px; height: 2px; background: var(--pink-dark); border-radius: 2px; }
 
-   .topbar-brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-   .topbar-brand-logo { width: 34px; height: 34px; object-fit: contain; flex: 0 0 34px; }
-   .topbar-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
-   .topbar-brand-title { font-family: var(--font-display); font-weight: 800; font-size: 15px; color: var(--pink-dark); }
-   .topbar-brand-sub { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
-
-   .topbar-page { flex: 1; min-width: 0; padding-left: 6px; border-left: 1px solid var(--border); margin-left: 2px; }
-   .topbar-page h1 {
-     font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -0.01em;
-     padding-left: 14px;
+   .content-title {
+     flex: 1; min-width: 0; font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -0.01em;
      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
    }
    .main-header-actions { display: flex; gap: 10px; flex: 0 0 auto; }
@@ -256,7 +242,7 @@
    .nav-item-danger.active { background: rgba(220,53,69,0.35); color: #fff; }
    .nav-item-danger.active::before { background: #fff; }
 
-   /* ---------- Account menu (inline in the header) ---------- */
+   /* ---------- Account menu (inline in the content topbar) ---------- */
    .topbar-avatar-wrap { position: relative; flex: 0 0 auto; }
    .avatar-btn {
      width: 38px; height: 38px; border-radius: 50%; border: none;
@@ -286,13 +272,14 @@
    .avatar-menu-item:hover { background: var(--pink-soft); }
 
    /* ==========================================================
-      App shell — left identity rail + main content, below the
-      fixed header. The rail is styled exactly like the e-badge
-      download platform's .identity panel: gate photo + brand
-      gradient, dot grid, gold eyebrow, gradient Fraunces headline,
-      pill date chip, venue line, footer note pinned to the bottom.
+      App shell — left identity rail + main content, now filling
+      the full viewport height (no fixed header above it anymore).
+      The rail is styled exactly like the e-badge download
+      platform's .identity panel: gate photo + brand gradient,
+      dot grid, gold eyebrow, gradient Fraunces headline, pill
+      date chip, venue line, footer note pinned to the bottom.
       ========================================================== */
-   .app-shell { display: flex; height: calc(100vh - var(--topbar-h)); overflow: hidden; }
+   .app-shell { display: flex; height: 100vh; overflow: hidden; }
 
    .sidebar {
      width: 300px; flex: 0 0 300px;
@@ -308,7 +295,7 @@
      height: 100%; overflow-y: auto;
    }
    .identity-dots {
-     position: absolute; top: -10px; right: -10px; width: 160px; height: 160px;
+     position: absolute; top: -10px; right: -10px; width: 220px; height: 220px;
      background-image: radial-gradient(rgba(255,255,255,0.28) 1.6px, transparent 1.6px);
      background-size: 17px 17px;
      -webkit-mask-image: radial-gradient(circle at top right, #000 0%, transparent 75%);
@@ -388,71 +375,6 @@
    .btn:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible {
      outline: 2px solid var(--pink);
      outline-offset: 2px;
-   }
-   
-   /* ---------- Overview hero banner ----------
-      A clean brand-gradient banner (no photo) — the identity panel on
-      the left already carries the photographic moment, so this stays
-      a crisp color block instead of repeating the image. */
-   .overview-hero {
-     position: relative;
-     overflow: hidden;
-     border-radius: var(--radius-lg);
-     padding: 40px 34px;
-     margin-bottom: 26px;
-     color: #fff;
-     min-height: 168px;
-     display: flex;
-     align-items: center;
-     background: var(--brand-gradient);
-     box-shadow: var(--shadow-lg);
-     animation: card-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-   }
-   .overview-hero::before {
-     content: "";
-     position: absolute; inset: 0;
-     background-image: radial-gradient(rgba(255,255,255,0.14) 1.6px, transparent 1.6px);
-     background-size: 18px 18px;
-     -webkit-mask-image: radial-gradient(circle at top right, #000 0%, transparent 65%);
-     mask-image: radial-gradient(circle at top right, #000 0%, transparent 65%);
-     pointer-events: none;
-   }
-   .overview-hero::after {
-     content: "";
-     position: absolute;
-     width: 260px; height: 260px;
-     border-radius: 50%;
-     background: radial-gradient(circle, rgba(244,185,66,0.32), transparent 70%);
-     bottom: -130px; right: 8%;
-     pointer-events: none;
-   }
-   .overview-hero-content { position: relative; max-width: 640px; }
-   .overview-hero-eyebrow {
-     margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase;
-     letter-spacing: 0.1em; color: var(--gold-soft);
-     text-shadow: 0 1px 6px rgba(98, 10, 56, 0.5);
-   }
-   .overview-hero-title {
-     margin: 0 0 10px; font-family: var(--font-display); font-weight: 800;
-     font-size: 30px; line-height: 1.15; letter-spacing: -0.01em;
-     text-shadow: 0 2px 12px rgba(98, 10, 56, 0.5);
-   }
-   .overview-hero-sub {
-     margin: 0; font-size: 14.5px; color: rgba(255,255,255,0.92); line-height: 1.6;
-     text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
-   }
-   .overview-hero-badge {
-     display: inline-block; margin-top: 14px; padding: 5px 14px; border-radius: 999px;
-     background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.3);
-     font-size: 12.5px; font-weight: 600;
-     -webkit-backdrop-filter: blur(3px);
-     backdrop-filter: blur(3px);
-   }
-   
-   @media (max-width: 640px) {
-     .overview-hero { padding: 28px 22px; min-height: 0; }
-     .overview-hero-title { font-size: 22px; }
-     .overview-hero-sub { font-size: 13px; }
    }
    
    /* ---------- Cards / stats ----------
@@ -754,16 +676,13 @@
       drawer mechanism as before). */
    @media (max-width: 900px) {
      .hamburger-btn { display: flex; }
-     .topbar-brand-sub { display: none; }
-     .topbar-page { border-left: none; margin-left: 0; padding-left: 0; }
-     .topbar-page h1 { padding-left: 0; font-size: 16px; }
-     .topbar-row { padding: 0 12px; gap: 10px; }
+     .content-title { font-size: 17px; }
 
-     .app-shell { height: calc(100vh - var(--topbar-h)); }
+     .app-shell { height: 100vh; }
 
      .sidebar {
        position: fixed;
-       top: var(--topbar-h); left: 0; bottom: 0;
+       top: 0; left: 0; bottom: 0;
        width: 78vw;
        max-width: 320px;
        height: auto;
