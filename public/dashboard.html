@@ -11,38 +11,6 @@
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- FIXED TOP HEADER — brand strip + page title/actions only.
-     Section tabs live inside the left identity panel now. -->
-<header class="app-topbar">
-  <div class="topbar-row">
-    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">
-      <span></span><span></span><span></span>
-    </button>
-
-    <div class="topbar-brand">
-      <img src="/assets/ieml-logo.png" alt="IEML" class="topbar-brand-logo" onerror="this.style.display='none'" />
-      <div class="topbar-brand-text">
-        <span class="topbar-brand-title">Sourcing Days</span>
-        <span class="topbar-brand-sub">Admin Portal</span>
-      </div>
-    </div>
-
-    <div class="topbar-page">
-      <h1 id="pageTitle">Overview</h1>
-    </div>
-
-    <div class="main-header-actions" id="headerActions"></div>
-
-    <div class="topbar-avatar-wrap" id="avatarWrap">
-      <button class="avatar-btn" id="avatarBtn" title="Account" aria-label="Account menu">👤</button>
-      <div class="avatar-menu" id="avatarMenu">
-        <button class="avatar-menu-item" id="homeMenuBtn">🏠 Home</button>
-        <button class="avatar-menu-item" id="logoutMenuBtn">🚪 Logout</button>
-      </div>
-    </div>
-  </div>
-</header>
-
 <div class="app-shell">
   <!-- LEFT IDENTITY RAIL — same visual language as the e-badge download
        platform's .identity panel (dot grid, gate-photo + brand gradient,
@@ -90,6 +58,24 @@
   </aside>
 
   <main class="main">
+    <div class="content-topbar">
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+
+      <h1 id="pageTitle" class="content-title">Overview</h1>
+
+      <div class="main-header-actions" id="headerActions"></div>
+
+      <div class="topbar-avatar-wrap" id="avatarWrap">
+        <button class="avatar-btn" id="avatarBtn" title="Account" aria-label="Account menu">👤</button>
+        <div class="avatar-menu" id="avatarMenu">
+          <button class="avatar-menu-item" id="homeMenuBtn">🏠 Home</button>
+          <button class="avatar-menu-item" id="logoutMenuBtn">🚪 Logout</button>
+        </div>
+      </div>
+    </div>
+
     <div id="viewArea"></div>
   </main>
 </div>
