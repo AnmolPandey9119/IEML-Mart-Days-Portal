@@ -207,45 +207,64 @@
 
    /* ---------- Section nav — vertical list inside the identity panel ---------- */
    nav.nav-list {
-     display: flex; flex-direction: column; gap: 5px;
+     display: flex; flex-direction: column; gap: 7px;
      margin-top: 4px; margin-bottom: 10px;
      padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.22);
-     flex: 1 1 auto; min-height: 0; overflow-y: auto;
+     flex: 1 1 auto;
    }
    .nav-item {
-     display: flex; align-items: center; gap: 11px;
-     padding: 8px 13px; border-radius: 13px; font-size: 13.5px; font-weight: 600;
+     display: flex; align-items: center; gap: 12px;
+     padding: 9px 13px; border-radius: 14px; font-size: 13.5px; font-weight: 600;
      letter-spacing: 0.01em;
      color: rgba(255,255,255,0.88); text-decoration: none;
-     border: 1px solid rgba(255,255,255,0.10);
-     background: rgba(255,255,255,0.05);
+     border: 1px solid rgba(255,255,255,0.08);
+     background: rgba(255,255,255,0.045);
      cursor: pointer; text-align: left; width: 100%;
      flex-shrink: 0;
      position: relative;
      box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
-     transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+     transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
    }
    .nav-icon {
      display: inline-flex; align-items: center; justify-content: center;
-     width: 26px; height: 26px; border-radius: 9px; font-size: 13px; flex-shrink: 0;
+     width: 28px; height: 28px; border-radius: 10px; font-size: 13.5px; flex-shrink: 0;
      background: rgba(255,255,255,0.16);
-     box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-     transition: background 0.15s, transform 0.15s;
+     box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.08) inset;
+     transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
    }
-   .nav-item:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.22); transform: translateX(3px); }
-   .nav-item:hover .nav-icon { transform: scale(1.08); }
+   /* Each tab gets its own tinted icon chip — the same colour language
+      as the stat cards on the right, so the nav doubles as a little
+      legend and each item is instantly distinguishable at a glance. */
+   .nav-item:nth-of-type(1) .nav-icon { background: linear-gradient(140deg, #ffd77a, #e6a418); color: #4a2f00; }
+   .nav-item:nth-of-type(2) .nav-icon { background: linear-gradient(140deg, #8fa6f2, #3a4fb0); color: #101b45; }
+   .nav-item:nth-of-type(3) .nav-icon { background: linear-gradient(140deg, #c79bf0, #7a35b3); color: #2c0f45; }
+   .nav-item:nth-of-type(4) .nav-icon { background: linear-gradient(140deg, #74dba8, #1e8e5a); color: #06341d; }
+   .nav-item:nth-of-type(5) .nav-icon { background: linear-gradient(140deg, #7fd6d3, #1f8a8c); color: #06302f; }
+
+   .nav-item:hover {
+     background: rgba(255,255,255,0.11);
+     border-color: rgba(255,255,255,0.24);
+     transform: translateX(4px);
+     box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+   }
+   .nav-item:hover .nav-icon { transform: scale(1.1) rotate(-4deg); }
    .nav-item.active {
-     background: linear-gradient(100deg, rgba(244,185,66,0.22), rgba(255,255,255,0.10));
-     border-color: rgba(244,185,66,0.5);
+     background: linear-gradient(100deg, rgba(244,185,66,0.24), rgba(255,255,255,0.09));
+     border-color: rgba(244,185,66,0.55);
      color: #fff;
-     box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+     box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 1px rgba(244,185,66,0.15) inset;
    }
-   .nav-item.active .nav-icon { background: var(--gold); box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+   .nav-item.active .nav-icon {
+     background: linear-gradient(140deg, var(--gold-soft), var(--gold));
+     color: #4a2f00;
+     box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+   }
    .nav-item.active::before {
      content: "";
-     position: absolute; left: -12px; top: 8px; bottom: 8px; width: 4px;
+     position: absolute; left: -12px; top: 6px; bottom: 6px; width: 4px;
      border-radius: 0 4px 4px 0;
-     background: var(--gold);
+     background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+     box-shadow: 0 0 10px rgba(244,185,66,0.7);
    }
    .nav-item-danger { color: #ffd3d3; margin-top: 6px; border-color: rgba(255,120,120,0.18); background: rgba(220,53,69,0.08); }
    .nav-item-danger .nav-icon { background: rgba(255,120,120,0.18); }
@@ -304,7 +323,7 @@
      background-position: center 35%;
      padding: 20px 26px;
      display: flex; flex-direction: column;
-     height: 100%; overflow-y: auto;
+     height: 100%; overflow-y: hidden;
    }
    .identity-dots {
      position: absolute; top: -10px; right: -10px; width: 220px; height: 220px;
