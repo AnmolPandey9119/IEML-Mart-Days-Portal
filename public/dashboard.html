@@ -9,58 +9,91 @@
 </head>
 <body>
 
-<div class="mobile-topbar">
-  <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="mobile-topbar-title">
-    <img src="/assets/ieml-logo.png" alt="" />
-    <span>Sourcing Days</span>
-  </div>
-</div>
-
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<div class="app-shell">
-  <aside class="sidebar" id="sidebar">
-    <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close menu">✕</button>
-    <div class="sidebar-brand">
-      <div class="sidebar-brand-mark"><img src="/assets/ieml-logo.png" alt="India Exposition Mart Ltd. logo" /></div>
-      <div class="sidebar-brand-org">India Exposition Mart Limited</div>
-      <div class="sidebar-brand-edition" id="brandEdition"></div>
-      <div class="sidebar-brand-title">Sourcing Days</div>
-      <div class="sidebar-brand-tag" id="brandTag"></div>
-      <div class="sidebar-brand-divider"></div>
-      <div class="sidebar-brand-row">📅 <span id="eventCardDates"></span></div>
-      <div class="sidebar-brand-row">📍 <span id="eventCardVenue"></span></div>
+<!-- FIXED TOP HEADER — brand strip + page title/actions, with the section
+     tabs docked underneath. Everything that used to live in the left
+     sidebar's <nav> now lives here (same #navList id, same .nav-item
+     buttons, same data-view attributes — dashboard.js is untouched). -->
+<header class="app-topbar">
+  <div class="topbar-row">
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open event info">
+      <span></span><span></span><span></span>
+    </button>
+
+    <div class="topbar-brand">
+      <img src="/assets/ieml-logo.png" alt="IEML" class="topbar-brand-logo" onerror="this.style.display='none'" />
+      <div class="topbar-brand-text">
+        <span class="topbar-brand-title">Sourcing Days</span>
+        <span class="topbar-brand-sub">Admin Portal</span>
+      </div>
     </div>
 
-    <nav class="nav-list" id="navList">
-      <button class="nav-item" data-view="overview"><span class="nav-icon">🏠</span> Overview</button>
-      <button class="nav-item" data-view="buyers"><span class="nav-icon">👥</span> Buyers</button>
-      <button class="nav-item" data-view="martOwners"><span class="nav-icon">🏬</span> Mart Owners</button>
-      <button class="nav-item" data-view="analytics"><span class="nav-icon">📊</span> Analytics</button>
-      <button class="nav-item" data-view="printHistory"><span class="nav-icon">🖨️</span> Print History</button>
-      <button class="nav-item nav-item-danger" data-view="dangerZone"><span class="nav-icon">⚠️</span> Danger Zone</button>
-    </nav>
+    <div class="topbar-page">
+      <h1 id="pageTitle">Overview</h1>
+    </div>
+
+    <div class="main-header-actions" id="headerActions"></div>
+
+    <div class="topbar-avatar-wrap" id="avatarWrap">
+      <button class="avatar-btn" id="avatarBtn" title="Account" aria-label="Account menu">👤</button>
+      <div class="avatar-menu" id="avatarMenu">
+        <button class="avatar-menu-item" id="homeMenuBtn">🏠 Home</button>
+        <button class="avatar-menu-item" id="logoutMenuBtn">🚪 Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="nav-list topbar-nav" id="navList">
+    <button class="nav-item" data-view="overview"><span class="nav-icon">🏠</span> Overview</button>
+    <button class="nav-item" data-view="buyers"><span class="nav-icon">👥</span> Buyers</button>
+    <button class="nav-item" data-view="martOwners"><span class="nav-icon">🏬</span> Mart Owners</button>
+    <button class="nav-item" data-view="analytics"><span class="nav-icon">📊</span> Analytics</button>
+    <button class="nav-item" data-view="printHistory"><span class="nav-icon">🖨️</span> Print History</button>
+    <button class="nav-item nav-item-danger" data-view="dangerZone"><span class="nav-icon">⚠️</span> Danger Zone</button>
+  </nav>
+</header>
+
+<div class="app-shell">
+  <!-- LEFT IDENTITY RAIL — same visual language as the e-badge download
+       platform's .identity panel (dot grid, gate-photo + brand gradient,
+       gold eyebrow, Fraunces gradient headline, pill chips, footer note
+       pinned to the bottom). Purely branding now; navigation lives in
+       the header above. On small screens this becomes the hamburger
+       drawer (same #sidebar / #sidebarCloseBtn ids as before). -->
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close">✕</button>
+
+    <div class="identity-dots" aria-hidden="true"></div>
+
+    <div class="identity-inner">
+      <img src="/assets/ieml-logo.png" alt="India Exposition Mart Ltd. logo" class="identity-logo" onerror="this.style.display='none'" />
+
+      <p class="identity-eyebrow">India Exposition Mart Limited</p>
+      <h2 class="identity-kicker">Sourcing<br />Days</h2>
+
+      <span class="identity-badge" id="brandEdition"></span>
+      <p class="identity-tagline" id="brandTag"></p>
+
+      <div class="identity-chips">
+        <span class="chip chip-fill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span id="eventCardDates"></span>
+        </span>
+      </div>
+
+      <p class="identity-venue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+        <span id="eventCardVenue"></span>
+      </p>
+
+      <p class="identity-footer">Internal admin console · India Expo Centre &amp; Mart</p>
+    </div>
   </aside>
 
   <main class="main">
-    <div class="main-header">
-      <h1 id="pageTitle">Overview</h1>
-      <div class="main-header-actions" id="headerActions"></div>
-    </div>
-
     <div id="viewArea"></div>
   </main>
-</div>
-
-<div class="topbar-avatar-wrap" id="avatarWrap">
-  <button class="avatar-btn" id="avatarBtn" title="Account" aria-label="Account menu">👤</button>
-  <div class="avatar-menu" id="avatarMenu">
-    <button class="avatar-menu-item" id="homeMenuBtn">🏠 Home</button>
-    <button class="avatar-menu-item" id="logoutMenuBtn">🚪 Logout</button>
-  </div>
 </div>
 
 <div class="modal-backdrop" id="ownerModalBackdrop">
