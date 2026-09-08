@@ -48,7 +48,26 @@ async function init() {
     const btn = e.target.closest(".nav-item");
     if (!btn) return;
     setView(btn.dataset.view);
+    closeSidebar();
   });
+
+  // ---- Mobile sidebar drawer ----
+  const sidebar = document.getElementById("sidebar");
+  const sidebarOverlay = document.getElementById("sidebarOverlay");
+  const hamburgerBtn = document.getElementById("hamburgerBtn");
+  const sidebarCloseBtn = document.getElementById("sidebarCloseBtn");
+
+  function openSidebar() {
+    sidebar.classList.add("open");
+    sidebarOverlay.classList.add("show");
+  }
+  function closeSidebar() {
+    sidebar.classList.remove("open");
+    sidebarOverlay.classList.remove("show");
+  }
+  hamburgerBtn.addEventListener("click", openSidebar);
+  sidebarCloseBtn.addEventListener("click", closeSidebar);
+  sidebarOverlay.addEventListener("click", closeSidebar);
 
   const avatarBtn = document.getElementById("avatarBtn");
   const avatarMenu = document.getElementById("avatarMenu");
