@@ -207,13 +207,13 @@
 
    /* ---------- Section nav — vertical list inside the identity panel ---------- */
    nav.nav-list {
-     display: flex; flex-direction: column; gap: 8px;
-     margin-top: 8px; margin-bottom: 18px;
-     padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.22);
+     display: flex; flex-direction: column; gap: clamp(4px, 1vh, 8px);
+     margin-top: clamp(4px, 1vh, 8px); margin-bottom: clamp(8px, 2.2vh, 18px);
+     padding-top: clamp(8px, 2.2vh, 18px); border-top: 1px solid rgba(255,255,255,0.22);
    }
    .nav-item {
      display: flex; align-items: center; gap: 11px;
-     padding: 10px 13px; border-radius: 13px; font-size: 13.5px; font-weight: 600;
+     padding: clamp(7px, 1.3vh, 10px) 13px; border-radius: 13px; font-size: 13.5px; font-weight: 600;
      letter-spacing: 0.01em;
      color: rgba(255,255,255,0.88); text-decoration: none;
      border: 1px solid rgba(255,255,255,0.10);
@@ -300,7 +300,7 @@
        url("/assets/expo-mart-gate.png");
      background-size: cover;
      background-position: center 35%;
-     padding: 34px 28px;
+     padding: clamp(18px, 4vh, 34px) 28px;
      display: flex; flex-direction: column;
      height: 100%; overflow-y: auto;
    }
@@ -320,41 +320,41 @@
    }
    .identity-inner { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
    .identity-logo {
-     width: 78px; height: 78px; object-fit: contain; margin-bottom: 18px;
+     width: clamp(44px, 7vh, 78px); height: clamp(44px, 7vh, 78px); object-fit: contain; margin-bottom: clamp(8px, 2vh, 18px);
      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
    }
    .identity-eyebrow {
-     margin: 0 0 6px; font-family: var(--font-display); font-weight: 700;
+     margin: 0 0 clamp(3px, 0.8vh, 6px); font-family: var(--font-display); font-weight: 700;
      font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase;
      white-space: nowrap;
      color: var(--gold-soft); text-shadow: 0 1px 6px rgba(98, 10, 56, 0.5);
    }
    .identity-kicker {
-     margin: 0 0 14px; font-family: var(--font-display); font-weight: 800;
-     font-size: 38px; line-height: 1.1; letter-spacing: -0.01em;
+     margin: 0 0 clamp(6px, 1.8vh, 14px); font-family: var(--font-display); font-weight: 800;
+     font-size: clamp(24px, 4.6vh, 38px); line-height: 1.08; letter-spacing: -0.01em;
      color: #fff;
      text-shadow: 0 2px 12px rgba(98, 10, 56, 0.5);
    }
    .identity-kicker-accent { color: var(--gold-soft); }
    .identity-badge {
-     display: inline-block; width: fit-content; margin-bottom: 12px;
+     display: inline-block; width: fit-content; margin-bottom: clamp(6px, 1.5vh, 12px);
      padding: 5px 13px; border-radius: 999px;
      background: linear-gradient(90deg, var(--gold-soft) 0%, var(--gold) 100%);
      color: #5a3600; font-family: var(--font-display); font-size: 11.5px; font-weight: 800;
      letter-spacing: 0.02em;
    }
    .identity-subheading {
-     margin: 0 0 12px; font-family: var(--font-display); font-weight: 800;
-     font-size: 32px; line-height: 1.15; letter-spacing: -0.01em;
+     margin: 0 0 clamp(6px, 1.5vh, 12px); font-family: var(--font-display); font-weight: 800;
+     font-size: clamp(20px, 3.9vh, 32px); line-height: 1.15; letter-spacing: -0.01em;
      background: linear-gradient(100deg, #fff 30%, var(--gold-soft) 60%, #fff 90%);
      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #fff;
      filter: drop-shadow(0 2px 10px rgba(98, 10, 56, 0.5));
    }
    .identity-tagline {
-     margin: 0 0 18px; font-size: 13px; line-height: 1.55; max-width: 32ch;
+     margin: 0 0 clamp(8px, 2.2vh, 18px); font-size: 13px; line-height: 1.55; max-width: 32ch;
      color: rgba(255,255,255,0.9); text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
    }
-   .identity-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+   .identity-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: clamp(6px, 1.7vh, 14px); }
    .chip {
      display: inline-flex; align-items: center; gap: 6px;
      font-weight: 600; font-size: 12.5px; padding: 7px 12px; border-radius: 999px;
@@ -365,14 +365,14 @@
      -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
    }
    .identity-venue {
-     display: flex; align-items: flex-start; gap: 8px; margin: 0 0 18px;
-     padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.22);
+     display: flex; align-items: flex-start; gap: 8px; margin: 0 0 clamp(8px, 2.2vh, 18px);
+     padding-top: clamp(8px, 1.9vh, 16px); border-top: 1px solid rgba(255,255,255,0.22);
      font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,0.92);
      text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
    }
    .identity-venue svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; color: var(--gold-soft); }
    .identity-footer {
-     margin: auto 0 0; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.22);
+     margin: auto 0 0; padding-top: clamp(8px, 1.7vh, 14px); border-top: 1px solid rgba(255,255,255,0.22);
      font-size: 11.5px; color: rgba(255,255,255,0.82);
      text-shadow: 0 1px 6px rgba(98, 10, 56, 0.4);
    }
