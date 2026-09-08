@@ -182,11 +182,11 @@
    }
    
    /* ==========================================================
-      Fixed top header — brand strip + page title/actions on row
-      one, section tabs (former sidebar nav) docked on row two.
+      Fixed top header — brand strip + page title/actions only.
       Sticky so it stays put while the page content scrolls.
+      Section tabs live inside the left identity panel (below).
       ========================================================== */
-   :root { --topbar-h: 64px; --topbar-nav-h: 50px; }
+   :root { --topbar-h: 64px; }
 
    .app-topbar {
      position: sticky; top: 0; z-index: 140;
@@ -219,41 +219,44 @@
    }
    .main-header-actions { display: flex; gap: 10px; flex: 0 0 auto; }
 
-   /* nav tabs row — same #navList / .nav-item / data-view markup that used
-      to sit in the sidebar; only the layout direction changed. */
-   nav.nav-list.topbar-nav {
-     display: flex; flex-direction: row; gap: 4px; flex: none;
-     height: var(--topbar-nav-h);
-     padding: 0 18px;
-     overflow-x: auto; overflow-y: hidden;
-     scrollbar-width: none;
+   /* ---------- Section nav — vertical list inside the identity panel ---------- */
+   nav.nav-list {
+     display: flex; flex-direction: column; gap: 4px;
+     margin-top: 6px; margin-bottom: 18px;
+     padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.22);
    }
-   .topbar-nav::-webkit-scrollbar { display: none; }
    .nav-item {
-     display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
-     padding: 8px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
-     color: #4a3a45; text-decoration: none; border: none; background: none;
-     cursor: pointer; text-align: left; white-space: nowrap;
-     position: relative; margin: 7px 0;
-     transition: background 0.15s, color 0.15s, transform 0.1s;
+     display: flex; align-items: center; gap: 10px;
+     padding: 9px 12px; border-radius: 11px; font-size: 13.5px; font-weight: 600;
+     color: rgba(255,255,255,0.88); text-decoration: none; border: none; background: none;
+     cursor: pointer; text-align: left; width: 100%;
+     position: relative;
+     transition: background 0.15s, color 0.15s, padding-left 0.15s;
    }
    .nav-icon {
      display: inline-flex; align-items: center; justify-content: center;
-     width: 22px; height: 22px; border-radius: 7px; font-size: 12.5px; flex-shrink: 0;
-     background: var(--pink-soft);
+     width: 24px; height: 24px; border-radius: 7px; font-size: 12.5px; flex-shrink: 0;
+     background: rgba(255,255,255,0.14);
      transition: background 0.15s, transform 0.15s;
    }
    .nav-item:hover .nav-icon { transform: scale(1.08); }
-   .nav-item.active .nav-icon { background: #fff; box-shadow: 0 2px 6px rgba(163,0,59,0.18); }
-   .nav-item-danger .nav-icon { background: var(--error-bg); }
+   .nav-item.active .nav-icon { background: var(--gold); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+   .nav-item-danger .nav-icon { background: rgba(255,255,255,0.14); }
    .nav-item-danger.active .nav-icon { background: #fff; }
-   .nav-item:hover { background: var(--pink-soft); }
-   .nav-item.active { background: var(--brand-gradient); color: #fff; box-shadow: 0 6px 16px rgba(163,0,59,0.28); }
-   .nav-item-danger { color: var(--error); }
-   .nav-item-danger:hover { background: var(--error-bg); }
-   .nav-item-danger.active { background: linear-gradient(135deg, var(--error), #8f241a); color: #fff; }
+   .nav-item:hover { background: rgba(255,255,255,0.1); padding-left: 15px; }
+   .nav-item.active { background: rgba(255,255,255,0.16); color: #fff; }
+   .nav-item.active::before {
+     content: "";
+     position: absolute; left: -12px; top: 8px; bottom: 8px; width: 4px;
+     border-radius: 0 4px 4px 0;
+     background: var(--gold);
+   }
+   .nav-item-danger { color: #ffd3d3; margin-top: 4px; }
+   .nav-item-danger:hover { background: rgba(220,53,69,0.25); }
+   .nav-item-danger.active { background: rgba(220,53,69,0.35); color: #fff; }
+   .nav-item-danger.active::before { background: #fff; }
 
-   /* ---------- Account menu (now inline in the header, not floating) ---------- */
+   /* ---------- Account menu (inline in the header) ---------- */
    .topbar-avatar-wrap { position: relative; flex: 0 0 auto; }
    .avatar-btn {
      width: 38px; height: 38px; border-radius: 50%; border: none;
@@ -289,7 +292,7 @@
       gradient, dot grid, gold eyebrow, gradient Fraunces headline,
       pill date chip, venue line, footer note pinned to the bottom.
       ========================================================== */
-   .app-shell { display: flex; height: calc(100vh - var(--topbar-h) - var(--topbar-nav-h)); overflow: hidden; }
+   .app-shell { display: flex; height: calc(100vh - var(--topbar-h)); overflow: hidden; }
 
    .sidebar {
      width: 300px; flex: 0 0 300px;
@@ -388,10 +391,9 @@
    }
    
    /* ---------- Overview hero banner ----------
-      The gate photo's big, confident moment — the Overview page's
-      first thing on screen, the same role the identity panel plays on
-      the badge-download page. Everything below it (stat grid, quick
-      links) stays exactly as it was structurally. */
+      A clean brand-gradient banner (no photo) — the identity panel on
+      the left already carries the photographic moment, so this stays
+      a crisp color block instead of repeating the image. */
    .overview-hero {
      position: relative;
      overflow: hidden;
@@ -402,11 +404,7 @@
      min-height: 168px;
      display: flex;
      align-items: center;
-     background-image:
-       linear-gradient(100deg, rgba(163, 15, 87, 0.92) 0%, rgba(98, 10, 56, 0.72) 55%, rgba(98, 10, 56, 0.4) 100%),
-       url("/assets/expo-mart-gate.png");
-     background-size: cover;
-     background-position: center 38%;
+     background: var(--brand-gradient);
      box-shadow: var(--shadow-lg);
      animation: card-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
    }
@@ -750,23 +748,22 @@
    .sidebar-overlay.show { display: block; }
    .sidebar-close-btn { display: none; }
 
-   /* Below 900px the header keeps its two rows (brand + nav tabs stay
-      fixed exactly as on desktop, just narrower), while the identity
-      rail collapses off-canvas — reopened via the hamburger button,
-      same #sidebar/#sidebarOverlay drawer mechanism as before. */
+   /* Below 900px the header stays a single fixed row (narrower), while
+      the identity rail — nav tabs and all — collapses off-canvas,
+      reopened via the hamburger button (same #sidebar/#sidebarOverlay
+      drawer mechanism as before). */
    @media (max-width: 900px) {
      .hamburger-btn { display: flex; }
      .topbar-brand-sub { display: none; }
      .topbar-page { border-left: none; margin-left: 0; padding-left: 0; }
      .topbar-page h1 { padding-left: 0; font-size: 16px; }
      .topbar-row { padding: 0 12px; gap: 10px; }
-     .topbar-nav { padding: 0 10px; }
 
-     .app-shell { height: calc(100vh - var(--topbar-h) - var(--topbar-nav-h)); }
+     .app-shell { height: calc(100vh - var(--topbar-h)); }
 
      .sidebar {
        position: fixed;
-       top: calc(var(--topbar-h) + var(--topbar-nav-h)); left: 0; bottom: 0;
+       top: var(--topbar-h); left: 0; bottom: 0;
        width: 78vw;
        max-width: 320px;
        height: auto;
