@@ -250,6 +250,7 @@
      color: rgba(255,255,255,0.88); text-decoration: none;
      border: 1px solid rgba(255,255,255,0.08);
      background: rgba(255,255,255,0.045);
+     -webkit-backdrop-filter: blur(6px);
      backdrop-filter: blur(6px);
      cursor: pointer; text-align: left; width: 100%;
      flex-shrink: 0;
