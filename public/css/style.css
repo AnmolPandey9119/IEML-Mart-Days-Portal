@@ -45,6 +45,14 @@
      --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
    }
    
+   /* Shared inline-icon sizing — every SVG icon (nav, stat cards, panel
+      headings, table row actions, buttons, avatar menu) uses this one
+      class so the icon set reads as one deliberate language instead of
+      mismatched emoji glyphs. Icons inherit colour via currentColor,
+      so they automatically pick up whatever tint their container
+      already defines (accent stat-card colour, action-btn tint, etc). */
+   .icon { width: 1em; height: 1em; display: inline-block; vertical-align: -0.15em; flex-shrink: 0; }
+
    * { box-sizing: border-box; }
    html, body { height: 100%; }
    body {
@@ -156,6 +164,16 @@
      font-family: inherit; background: #fff; box-sizing: border-box;
      transition: border-color 0.15s, box-shadow 0.15s;
    }
+   /* Login fields: small leading icon inside the input, purely
+      decorative — markup wraps the existing <label>+<input> in a
+      position:relative box and adds one <svg class="field-icon">. */
+   .field-icon-wrap { position: relative; }
+   .field-icon-wrap .icon {
+     position: absolute; left: 12px; top: 50%; transform: translateY(-1px);
+     width: 15px; height: 15px; color: var(--muted); pointer-events: none;
+   }
+   .field-icon-wrap input { padding-left: 36px; }
+   .field-icon-wrap input:focus ~ .icon { color: var(--pink); }
    .field select:disabled, .field input:disabled { background: #f6f2f4; color: var(--muted); cursor: not-allowed; }
    .field input:focus, .field select:focus { border-color: var(--pink); box-shadow: 0 0 0 4px var(--pink-bg); }
    .primary-btn {
@@ -233,6 +251,7 @@
      box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.08) inset;
      transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
    }
+   .nav-icon .icon { width: 15px; height: 15px; }
    /* Each tab gets its own tinted icon chip — the same colour language
       as the stat cards on the right, so the nav doubles as a little
       legend and each item is instantly distinguishable at a glance. */
@@ -284,6 +303,8 @@
      transition: filter 0.15s, transform 0.15s;
    }
    .avatar-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+   .avatar-btn .icon { width: 17px; height: 17px; }
+   .avatar-menu-item .icon { width: 15px; height: 15px; color: var(--pink-dark); }
    .avatar-menu {
      display: none; position: absolute; top: 48px; right: 0;
      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
@@ -408,11 +429,23 @@
    }
 
    .main { flex: 1; min-height: 0; padding: 28px 32px; max-width: 100%; overflow-y: auto; overflow-x: hidden; height: 100%; }
+
+   /* Every time a view re-renders (innerHTML swap in dashboard.js), its
+      top-level blocks are freshly-inserted DOM nodes, so this animation
+      replays automatically on each view switch — no JS hook needed. */
+   #viewArea > * { animation: view-fade 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+   #viewArea > *:nth-child(1) { animation-delay: 0s; }
+   #viewArea > *:nth-child(2) { animation-delay: 0.05s; }
+   #viewArea > *:nth-child(3) { animation-delay: 0.1s; }
+   #viewArea > *:nth-child(4) { animation-delay: 0.15s; }
+   @keyframes view-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
    .btn {
+     display: inline-flex; align-items: center; gap: 7px;
      padding: 9px 17px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
      background: #fff; font-weight: 600; font-size: 13px; color: var(--ink);
      transition: background 0.15s, border-color 0.15s, transform 0.05s;
    }
+   .btn .icon { width: 14px; height: 14px; }
    .btn:hover { background: var(--pink-soft); border-color: var(--pink-bg); }
    .btn:active { transform: scale(0.97); }
    .btn.primary { background: var(--brand-gradient); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(163,0,59,0.24); }
@@ -476,23 +509,30 @@
      font-size: 16px; margin-bottom: 10px;
      background: var(--pink-soft);
    }
-   .stat-grid .stat-card:nth-child(6n+1) .stat-card-icon { background: var(--pink-bg); }
-   .stat-grid .stat-card:nth-child(6n+2) .stat-card-icon { background: var(--success-bg); }
-   .stat-grid .stat-card:nth-child(6n+3) .stat-card-icon { background: #fff1e0; }
-   .stat-grid .stat-card:nth-child(6n+4) .stat-card-icon { background: var(--indigo-bg); }
-   .stat-grid .stat-card:nth-child(6n+5) .stat-card-icon { background: #f2e8fb; }
-   .stat-grid .stat-card:nth-child(6n+6) .stat-card-icon { background: var(--error-bg); }
+   .stat-grid .stat-card:nth-child(6n+1) .stat-card-icon { background: var(--pink-bg); color: var(--pink-dark); }
+   .stat-grid .stat-card:nth-child(6n+2) .stat-card-icon { background: var(--success-bg); color: var(--success); }
+   .stat-grid .stat-card:nth-child(6n+3) .stat-card-icon { background: #fff1e0; color: #b3690a; }
+   .stat-grid .stat-card:nth-child(6n+4) .stat-card-icon { background: var(--indigo-bg); color: var(--indigo); }
+   .stat-grid .stat-card:nth-child(6n+5) .stat-card-icon { background: #f2e8fb; color: #7a35b3; }
+   .stat-grid .stat-card:nth-child(6n+6) .stat-card-icon { background: var(--error-bg); color: var(--error); }
+   .stat-card-icon .icon { width: 17px; height: 17px; }
+   /* A stat card whose icon carries its own literal colour (e.g. the
+      green "Approved" / red "Rejected" dot on Analytics) overrides the
+      positional accent above via an inline style, so its meaning stays
+      correct regardless of where it lands in the grid. */
    
    .panel {
      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
      padding: 20px; box-shadow: var(--shadow); margin-bottom: 18px;
    }
    .panel h3 { margin: 0 0 14px; font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+   .panel h3 .icon { color: var(--pink); width: 16px; height: 16px; }
    .danger-panel {
      background: linear-gradient(180deg, #fff5f5, #fff 60%); border: 2px solid #f3b7b7; border-radius: var(--radius);
      padding: 22px; margin-bottom: 20px;
    }
-   .danger-panel h3 { color: var(--error); margin: 0 0 8px; font-size: 16.5px; }
+   .danger-panel h3 { color: var(--error); margin: 0 0 8px; font-size: 16.5px; display: flex; align-items: center; gap: 9px; }
+   .danger-panel h3 .icon { width: 18px; height: 18px; }
    .danger-panel p { font-size: 13.5px; color: #6b3d3d; line-height: 1.6; margin: 0 0 14px; }
    .danger-confirm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
    .danger-confirm-row input[type="text"] {
@@ -617,9 +657,11 @@
      color: var(--pink-dark); font-size: 11px; font-weight: 800; line-height: 1; cursor: pointer;
    }
    .clear-all-btn {
+     display: inline-flex; align-items: center; gap: 5px;
      border: none; background: none; color: var(--error); font-weight: 700; font-size: 12.5px;
      padding: 6px 10px; white-space: nowrap;
    }
+   .clear-all-btn .icon { width: 12.5px; height: 12.5px; }
    .clear-all-btn:hover { text-decoration: underline; }
    
    /* ---------- Table ----------
@@ -641,6 +683,16 @@
    tbody tr:hover { background: #fffafc; }
    .table-scroll { overflow-x: auto; max-width: 100%; }
    .empty-state, .loading-state { padding: 44px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+   .loading-state::before {
+     content: ""; display: block; width: 26px; height: 26px; margin: 0 auto 14px;
+     border-radius: 50%; border: 3px solid var(--pink-bg); border-top-color: var(--pink);
+     animation: spin 0.7s linear infinite;
+   }
+   @keyframes spin { to { transform: rotate(360deg); } }
+   .empty-state::before {
+     content: ""; display: block; width: 40px; height: 40px; margin: 0 auto 14px;
+     border: 2px dashed var(--border); border-radius: 12px;
+   }
    
    .attend-checkbox { width: 18px; height: 18px; accent-color: var(--pink); cursor: pointer; }
    
@@ -665,6 +717,7 @@
    .action-btn.delete { background: var(--error-bg); color: var(--error); }
    .action-btn:hover { filter: brightness(0.94); transform: translateY(-1px); }
    .action-btn:disabled { opacity: 0.5; }
+   .action-btn .icon { width: 13.5px; height: 13.5px; }
    
    .table-footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); flex-wrap: wrap; gap: 10px; }
    .table-footer-right { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
@@ -747,6 +800,7 @@
        background: rgba(255,255,255,0.16); color: #fff;
        font-size: 14px; font-weight: 700; margin-bottom: 10px; align-self: flex-end;
      }
+     .sidebar-close-btn .icon { width: 13px; height: 13px; }
      .identity-kicker { font-size: 27px; }
      .identity-subheading { font-size: 23px; }
 

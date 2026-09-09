@@ -29,11 +29,17 @@
         <form id="loginForm">
           <div class="field">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" autocomplete="username" required />
+            <div class="field-icon-wrap">
+              <input type="text" id="username" name="username" autocomplete="username" required />
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
+            </div>
           </div>
           <div class="field">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password" required />
+            <div class="field-icon-wrap">
+              <input type="password" id="password" name="password" autocomplete="current-password" required />
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="1.8"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+            </div>
           </div>
           <button type="submit" class="primary-btn">Sign In</button>
           <div id="formMsg" class="form-msg"></div>
