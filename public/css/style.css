@@ -137,13 +137,19 @@
      display: inline-flex;
      align-items: center;
      justify-content: center;
-     width: 120px; height: 120px;
-     margin-bottom: 22px;
+     width: 104px; height: 104px;
+     margin-bottom: 20px;
      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.2));
    }
    .brand-mark img { width: 100%; height: 100%; object-fit: contain; }
-   .login-brand-title { font-size: 27px; font-weight: 800; line-height: 1.25; margin: 0 0 8px; text-shadow: 0 2px 12px rgba(109,0,48,0.4); }
-   .login-brand-tag { font-size: 14px; opacity: 0.94; margin-bottom: 22px; }
+   /* Brand block reuses the sidebar's .identity-* classes (same eyebrow /
+      gradient heading / edition badge language as the dashboard rail) so
+      the login screen and the dashboard read as one visual system —
+      these just bump sizing up a little for the wider, centered panel. */
+   .login-kicker { font-size: 32px; margin-bottom: 14px; }
+   .login-brand-panel .identity-badge { margin: 0 auto 14px; }
+   .login-subheading { font-size: 19px; margin-bottom: 9px; }
+   .login-tagline { font-size: 14px; max-width: 30ch; margin: 0 auto 20px; }
    .login-brand-dates { font-size: 13px; opacity: 0.85; line-height: 1.6; }
    
    .login-form-panel {
@@ -193,8 +199,9 @@
      .login-shell { padding: 0; align-items: flex-start; }
      .login-split { flex-direction: column; min-height: 100vh; border-radius: 0; max-width: 100%; }
      .login-brand-panel { flex: 0 0 auto; min-width: 0; width: 100%; padding: 32px 24px; }
-     .brand-mark { width: 84px; height: 84px; margin-bottom: 16px; }
-     .login-brand-title { font-size: 21px; }
+     .brand-mark { width: 80px; height: 80px; margin-bottom: 14px; }
+     .login-kicker { font-size: 26px; }
+     .login-subheading { font-size: 17px; }
      .login-form-panel { flex: 1 1 auto; width: 100%; padding: 32px 24px 40px; }
      .login-card { max-width: 100%; }
    }
