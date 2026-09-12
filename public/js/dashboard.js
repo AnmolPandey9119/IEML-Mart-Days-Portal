@@ -744,6 +744,9 @@ const BULK_HEADER_ALIASES = {
   companyname: "companyName", company: "companyName", organisation: "companyName", organization: "companyName",
   designation: "designation", jobtitle: "designation", role: "designation",
   buyertype: "buyerType", type: "buyerType",
+  // "type of buyer ?" — the actual column header used by the Meta/Facebook
+  // lead-ads form for this event (normalizes to "typeofbuyer").
+  typeofbuyer: "buyerType",
   email: "email", emailaddress: "email", emailid: "email",
   phone: "phone", phonenumber: "phone", mobile: "phone", mobilenumber: "phone", contactnumber: "phone", whatsappnumber: "phone",
   address: "address",
@@ -752,10 +755,16 @@ const BULK_HEADER_ALIASES = {
   district: "district", city: "district", citydistrict: "district",
   pincode: "pincode", zip: "pincode", zipcode: "pincode", postalcode: "pincode",
   natureofbusiness: "natureOfBusiness", business: "natureOfBusiness", industry: "natureOfBusiness",
+  // "please choose your nature of business" / "... ?" — both normalize to
+  // this same key, since normalizeHeader strips spaces/punctuation.
+  pleasechooseyournatureofbusiness: "natureOfBusiness",
   annualturnover: "annualTurnover", turnover: "annualTurnover",
   knownthrough: "knownThrough", howdidyouhear: "knownThrough", hearaboutus: "knownThrough",
   onlineseller: "onlineSeller", ecommerce: "onlineSeller",
   productsofinterest: "productsOfInterest", products: "productsOfInterest", interest: "productsOfInterest", interests: "productsOfInterest",
+  // "please select your products of interest?" — Meta form header for
+  // this event.
+  pleaseselectyourproductsofinterest: "productsOfInterest",
 };
 function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
