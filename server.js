@@ -73,6 +73,9 @@ const COL = {
   attendedAt: "attended_at",
   // Also added by migrations/schema.sql — registration approval workflow.
   status: "status",
+  // Also added by migrations/schema.sql — lead source ("Website" by
+  // default; "Meta" for anything brought in via Bulk Upload).
+  source: "source",
   // Business/interest details collected by the registration form.
   natureOfBusiness: "nature_of_business",
   annualTurnover: "annual_turnover",
@@ -95,7 +98,12 @@ const EDITABLE_VISITOR_FIELDS = [
   "buyerType", "fullName", "companyName", "designation",
   "email", "phone", "address", "country", "state", "district", "pincode",
   "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
+  "source",
 ];
+// Dropdown options offered for the "Source" field (filter + edit). Not
+// enforced strictly server-side — an existing/unusual value already on a
+// row is always preserved and shown as an extra option by the frontend.
+const SOURCE_VALUES = ["Website", "Meta", "Google", "Referral", "Walk-in", "Exhibitor Invite", "Other"];
 // Columns actually shown/searchable in the buyers table (in this order).
 const VISITOR_LIST_COLUMNS = [
   { key: "urn", label: "URN" },
@@ -103,6 +111,7 @@ const VISITOR_LIST_COLUMNS = [
   { key: "companyName", label: "Company" },
   { key: "designation", label: "Designation" },
   { key: "buyerType", label: "Buyer Type" },
+  { key: "source", label: "Source" },
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
   { key: "country", label: "Country" },
@@ -290,6 +299,10 @@ function buildVisitorWhere(query) {
     values.push(query.buyerType.trim());
     clauses.push(`${COL.buyerType} = $${values.length}`);
   }
+  if (query.source && query.source.trim()) {
+    values.push(query.source.trim());
+    clauses.push(`${COL.source} = $${values.length}`);
+  }
   if (query.status && STATUS_VALUES.includes(query.status)) {
     values.push(query.status);
     clauses.push(`${COL.status} = $${values.length}`);
@@ -443,9 +456,74 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------
+// Bulk Upload — imports buyers from an external CSV (e.g. a Meta /
+// Facebook lead-ads export). The frontend parses the CSV client-side
+// (so any reasonably-named column headers can be matched loosely) and
+// posts the already-mapped rows here as JSON. Every row inserted this
+// way:
+//   - is tagged ${COL.source} = "Meta" (the whole point of this feature)
+//   - gets a freshly generated URN, since bulk-uploaded leads never came
+//     from the registration site and so never had one
+// Rows missing a required field are skipped and reported back, not
+// silently dropped — the rest of the batch still goes through.
+// ---------------------------------------------------------------------
+const BULK_UPLOAD_FIELDS = [
+  "buyerType", "fullName", "companyName", "designation", "email", "phone",
+  "address", "country", "state", "district", "pincode",
+  "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
+];
+const BULK_REQUIRED_FIELDS = ["fullName", "companyName", "email", "phone"];
+const BULK_UPLOAD_SOURCE = "Meta";
+const BULK_MAX_ROWS = 5000;
+
+function generateBulkUrn() {
+  return `META-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
+  const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
+  if (rows.length === 0) return res.status(400).json({ error: "No rows to import." });
+  if (rows.length > BULK_MAX_ROWS) {
+    return res.status(400).json({ error: `Too many rows in one upload (max ${BULK_MAX_ROWS}).` });
+  }
+
+  let inserted = 0;
+  const failed = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const raw = rows[i] || {};
+    const missing = BULK_REQUIRED_FIELDS.filter((f) => !raw[f] || !String(raw[f]).trim());
+    if (missing.length) {
+      failed.push({ row: i + 2, error: `Missing required field(s): ${missing.join(", ")}` }); // +2 accounts for the CSV header row + 1-indexing
+      continue;
+    }
+    const cols = [COL.id, COL.source, COL.createdAt];
+    const values = [generateBulkUrn(), BULK_UPLOAD_SOURCE, new Date()];
+    for (const field of BULK_UPLOAD_FIELDS) {
+      const val = raw[field];
+      if (val === undefined || val === null || String(val).trim() === "") continue;
+      cols.push(COL[field]);
+      values.push(String(val).trim());
+    }
+    const placeholders = values.map((_, idx) => `$${idx + 1}`);
+    try {
+      await pool.query(
+        `INSERT INTO ${buyers_TABLE} (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`,
+        values
+      );
+      inserted++;
+    } catch (err) {
+      failed.push({ row: i + 2, error: err.message });
+    }
+  }
+
+  res.json({ success: true, inserted, failedCount: failed.length, failed: failed.slice(0, 50) });
+});
+
 app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
   try {
-    const labels = ["total", "buyerType", "country", "trend", "attended", "status", "state", "knownThrough"];
+    const labels = ["total", "buyerType", "country", "trend", "attended", "status", "state", "knownThrough", "source"];
     const results = await Promise.allSettled([
       pool.query(`SELECT COUNT(*)::int AS count FROM ${buyers_TABLE}`),
       pool.query(
@@ -473,11 +551,15 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
         `SELECT COALESCE(NULLIF(TRIM(${COL.knownThrough}), ''), 'Not specified') AS label, COUNT(*)::int AS count
          FROM ${buyers_TABLE} GROUP BY 1 ORDER BY count DESC LIMIT 8`
       ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(TRIM(${COL.source}), ''), 'Website') AS label, COUNT(*)::int AS count
+         FROM ${buyers_TABLE} GROUP BY 1 ORDER BY count DESC`
+      ),
     ]);
     results.forEach((r, i) => {
       if (r.status === "rejected") console.error(`visitor analytics "${labels[i]}" failed:`, r.reason && r.reason.message);
     });
-    const [total, buyerType, country, trend, attended, status, state, knownThrough] = results.map((r) =>
+    const [total, buyerType, country, trend, attended, status, state, knownThrough, source] = results.map((r) =>
       r.status === "fulfilled" ? r.value : { rows: [] }
     );
 
@@ -497,6 +579,7 @@ app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
       byStatus: status.rows,
       byState: state.rows,
       byKnownThrough: knownThrough.rows,
+      bySource: source.rows,
       trend: trend.rows,
     });
   } catch (err) {

@@ -40,6 +40,7 @@ const ICON_PATHS = {
   receipt: '<path d="M6 3h12v18l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z"/><path d="M9 8h6"/><path d="M9 12h6"/>',
   barChart: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M4 20h16"/>',
   alertTriangle: '<path d="M12 3.5 21.5 20h-19L12 3.5z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>',
+  upload: '<path d="M12 20V9"/><path d="M7 13l5-5 5 5"/><path d="M4 20h16"/>',
 };
 function ic(name) {
   return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ""}</svg>`;
@@ -49,7 +50,7 @@ function ic(name) {
 const buyersState = {
   page: 1, pageSize: 25, total: 0, rows: [],
   name: "", companyName: "", emailMobile: "", city: "", state: "", country: "",
-  buyerType: "", attended: "", status: "",
+  buyerType: "", attended: "", status: "", source: "",
 };
 const ownersState = {
   page: 1, pageSize: 25, total: 0, rows: [],
@@ -196,16 +197,17 @@ const STATUS_TAB_LABELS = { "": "All", Registered: "Registered", Approved: "Appr
 const CHIP_FIELDS = {
   name: "Name", companyName: "Company", emailMobile: "Email/Mobile",
   city: "City", state: "State", country: "Country",
-  buyerType: "Buyer Type", attended: "Checked In",
+  buyerType: "Buyer Type", source: "Source", attended: "Checked In",
 };
 const CHIP_INPUT_IDS = {
   name: "fName", companyName: "fCompanyName", emailMobile: "fEmailMobile",
   city: "fCity", state: "fState", country: "fCountry",
-  buyerType: "fBuyerType", attended: "fAttended",
+  buyerType: "fBuyerType", source: "fSource", attended: "fAttended",
 };
+const SOURCE_OPTIONS = ["Website", "Meta", "Google", "Referral", "Walk-in", "Exhibitor Invite", "Other"];
 const VISITOR_FIELD_LABELS = {
   urn: "URN", fullName: "Full Name", companyName: "Company Name", designation: "Designation",
-  buyerType: "Buyer Type", email: "Email", phone: "Phone", address: "Address",
+  buyerType: "Buyer Type", source: "Source", email: "Email", phone: "Phone", address: "Address",
   country: "Country", state: "State", district: "City / District", pincode: "Pincode",
   createdAt: "Registered On", status: "Status", attended: "Checked In",
   natureOfBusiness: "Nature of Business", annualTurnover: "Annual Turnover",
@@ -230,7 +232,11 @@ function visitorFilterParams() {
 
 function renderbuyers() {
   pageTitle.textContent = "Buyers";
-  headerActions.innerHTML = `<button class="btn" id="exportBtn">${ic('download')} Export CSV</button>`;
+  headerActions.innerHTML = `
+    <button class="btn" id="bulkUploadBtn">${ic('upload')} Bulk Upload</button>
+    <button class="btn" id="exportBtn">${ic('download')} Export CSV</button>
+  `;
+  document.getElementById("bulkUploadBtn").addEventListener("click", openBulkUploadModal);
   document.getElementById("exportBtn").addEventListener("click", () => {
     window.location.href = "/api/buyers/export?" + visitorFilterParams().toString();
   });
@@ -250,6 +256,12 @@ function renderbuyers() {
         <select id="fBuyerType">
           <option value="">All</option>
           ${BUYER_TYPES.map((t) => `<option value="${esc(t)}" ${buyersState.buyerType === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field-mini"><label>Source</label>
+        <select id="fSource">
+          <option value="">All</option>
+          ${SOURCE_OPTIONS.map((s) => `<option value="${esc(s)}" ${buyersState.source === s ? "selected" : ""}>${esc(s)}</option>`).join("")}
         </select>
       </div>
       <div class="field-mini"><label>Checked In</label>
@@ -324,6 +336,11 @@ function renderbuyers() {
 
   document.getElementById("fBuyerType").addEventListener("change", (e) => {
     buyersState.buyerType = e.target.value;
+    buyersState.page = 1;
+    loadbuyers();
+  });
+  document.getElementById("fSource").addEventListener("change", (e) => {
+    buyersState.source = e.target.value;
     buyersState.page = 1;
     loadbuyers();
   });
@@ -543,7 +560,7 @@ function openVisitorModal(row, mode) {
     title.textContent = "Buyer Details";
     saveBtn.style.display = "none";
     const viewKeys = [
-      "urn", "fullName", "companyName", "designation", "buyerType", "email", "phone",
+      "urn", "fullName", "companyName", "designation", "buyerType", "source", "email", "phone",
       "address", "country", "state", "district", "pincode",
       "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
       "createdAt", "status", "attended",
@@ -569,6 +586,7 @@ function openVisitorModal(row, mode) {
             ${BUYER_TYPES.map((t) => `<option value="${esc(t)}" ${row.buyerType === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
           </select>
         </div>
+        <div class="field"><label>Source</label>${selectWithFallbackHTML("evSource", SOURCE_OPTIONS, row.source, "Select source")}</div>
         <div class="field"><label>Email</label><input type="text" id="evEmail" value="${esc(row.email)}" /></div>
         <div class="field"><label>Phone</label><input type="text" id="evPhone" value="${esc(row.phone)}" /></div>
         <div class="field full"><label>Address</label><input type="text" id="evAddress" value="${esc(row.address)}" /></div>
@@ -674,6 +692,7 @@ document.getElementById("visitorModalSave").addEventListener("click", async () =
     companyName: document.getElementById("evCompanyName").value.trim(),
     designation: document.getElementById("evDesignation").value.trim(),
     buyerType: document.getElementById("evBuyerType").value,
+    source: document.getElementById("evSource").value,
     email: document.getElementById("evEmail").value.trim(),
     phone: document.getElementById("evPhone").value.trim(),
     address: document.getElementById("evAddress").value.trim(),
@@ -703,6 +722,204 @@ document.getElementById("visitorModalSave").addEventListener("click", async () =
     loadbuyers();
   } catch (err) {
     errorEl.textContent = err.message;
+  }
+});
+
+// ---------------------------------------------------------------------
+// Bulk Upload (CSV) — for buyers sourced from outside the registration
+// site (e.g. a Meta/Facebook lead-ads export). Every row imported this
+// way is tagged Source: Meta by the backend automatically. Parsing
+// happens entirely client-side; only the mapped rows are posted.
+// ---------------------------------------------------------------------
+const BULK_UPLOAD_TEMPLATE_HEADERS = [
+  "Full Name", "Company Name", "Designation", "Buyer Type", "Email", "Phone",
+  "Address", "Country", "State", "District", "Pincode",
+  "Nature of Business", "Annual Turnover", "Known Through", "Online Seller", "Products of Interest",
+];
+// Column headers are matched loosely (case/space/underscore-insensitive)
+// against these aliases, so a Meta export or a hand-built CSV both work
+// as long as the key columns are named something recognisable.
+const BULK_HEADER_ALIASES = {
+  fullname: "fullName", name: "fullName", buyername: "fullName", contactname: "fullName",
+  companyname: "companyName", company: "companyName", organisation: "companyName", organization: "companyName",
+  designation: "designation", jobtitle: "designation", role: "designation",
+  buyertype: "buyerType", type: "buyerType",
+  email: "email", emailaddress: "email", emailid: "email",
+  phone: "phone", phonenumber: "phone", mobile: "phone", mobilenumber: "phone", contactnumber: "phone", whatsappnumber: "phone",
+  address: "address",
+  country: "country",
+  state: "state", stateprovince: "state", province: "state",
+  district: "district", city: "district", citydistrict: "district",
+  pincode: "pincode", zip: "pincode", zipcode: "pincode", postalcode: "pincode",
+  natureofbusiness: "natureOfBusiness", business: "natureOfBusiness", industry: "natureOfBusiness",
+  annualturnover: "annualTurnover", turnover: "annualTurnover",
+  knownthrough: "knownThrough", howdidyouhear: "knownThrough", hearaboutus: "knownThrough",
+  onlineseller: "onlineSeller", ecommerce: "onlineSeller",
+  productsofinterest: "productsOfInterest", products: "productsOfInterest", interest: "productsOfInterest", interests: "productsOfInterest",
+};
+function normalizeHeader(h) {
+  return String(h || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Minimal CSV parser — handles quoted fields, embedded commas/newlines,
+// and escaped ("") quotes. Good enough for exports from Excel/Sheets/Meta.
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  const s = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\uFEFF/, "");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field); field = "";
+    } else if (c === "\n") {
+      row.push(field); rows.push(row); row = []; field = "";
+    } else {
+      field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter((r) => !(r.length === 1 && r[0].trim() === ""));
+}
+
+let bulkUploadParsedRows = null;
+
+function openBulkUploadModal() {
+  bulkUploadParsedRows = null;
+  const backdrop = document.getElementById("bulkUploadModalBackdrop");
+  const body = document.getElementById("bulkUploadModalBody");
+  const errorEl = document.getElementById("bulkUploadModalError");
+  const submitBtn = document.getElementById("bulkUploadModalSubmit");
+  errorEl.textContent = "";
+  submitBtn.style.display = "none";
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Import";
+
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 12px;">
+      Upload a CSV of buyers from an external source (e.g. a Meta / Facebook lead-ads export).
+      Every row imported here is tagged <b>Source: Meta</b> automatically.
+      Required columns: Full Name, Company Name, Email, Phone.
+    </p>
+    <p style="font-size:12.5px;margin:0 0 14px;">
+      <a href="#" id="bulkUploadSampleLink">${ic('download')} Download a sample CSV template</a>
+    </p>
+    <div class="field full" style="margin-bottom:14px;">
+      <label>CSV File</label>
+      <input type="file" id="bulkUploadFileInput" accept=".csv,text/csv" />
+    </div>
+    <div id="bulkUploadPreview"></div>
+  `;
+
+  document.getElementById("bulkUploadSampleLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    const csv = BULK_UPLOAD_TEMPLATE_HEADERS.join(",") + "\n" +
+      "Jane Doe,Acme Traders,Purchase Manager,Overseas buyers,jane@acme.com,+1 555 0100,123 Main St,United States,,New York,10001,Home Decor,USD 1-5 Million,Social media,Yes,\"Furniture, Lighting\"\n";
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "buyer-bulk-upload-template.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("bulkUploadFileInput").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    errorEl.textContent = "";
+    submitBtn.style.display = "none";
+    bulkUploadParsedRows = null;
+    const previewEl = document.getElementById("bulkUploadPreview");
+    previewEl.innerHTML = "";
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = parseCsv(String(reader.result));
+        if (rows.length < 2) throw new Error("CSV has no data rows.");
+        const headerRow = rows[0].map(normalizeHeader);
+        const mappedKeys = headerRow.map((h) => BULK_HEADER_ALIASES[h] || null);
+        if (!mappedKeys.includes("fullName") || !mappedKeys.includes("companyName") ||
+            !mappedKeys.includes("email") || !mappedKeys.includes("phone")) {
+          throw new Error('CSV must include columns for Full Name, Company Name, Email, and Phone (names are matched loosely — "Name", "Company", "Mobile" etc. also work).');
+        }
+        const parsed = [];
+        for (let r = 1; r < rows.length; r++) {
+          const cells = rows[r];
+          if (cells.every((c) => !c || !c.trim())) continue;
+          const obj = {};
+          mappedKeys.forEach((key, idx) => {
+            if (!key) return;
+            const val = (cells[idx] || "").trim();
+            if (val) obj[key] = val;
+          });
+          if (Object.keys(obj).length) parsed.push(obj);
+        }
+        if (parsed.length === 0) throw new Error("No usable data rows found in this CSV.");
+        bulkUploadParsedRows = parsed;
+        const unmapped = rows[0].filter((_, idx) => !mappedKeys[idx]);
+        previewEl.innerHTML = `
+          <div class="empty-state" style="text-align:left;padding:12px;">
+            <b>${parsed.length} row${parsed.length === 1 ? "" : "s"}</b> ready to import, all tagged <b>Source: Meta</b>.
+            ${unmapped.length ? `<br><span style="font-size:12px;color:var(--muted);">Columns not recognised (ignored): ${unmapped.map(esc).join(", ")}</span>` : ""}
+          </div>
+        `;
+        submitBtn.style.display = "inline-block";
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    };
+    reader.onerror = () => { errorEl.textContent = "Could not read that file."; };
+    reader.readAsText(file);
+  });
+
+  backdrop.classList.add("show");
+}
+
+document.getElementById("bulkUploadModalCancel").addEventListener("click", () => {
+  document.getElementById("bulkUploadModalBackdrop").classList.remove("show");
+});
+
+document.getElementById("bulkUploadModalSubmit").addEventListener("click", async () => {
+  if (!bulkUploadParsedRows || bulkUploadParsedRows.length === 0) return;
+  const errorEl = document.getElementById("bulkUploadModalError");
+  const submitBtn = document.getElementById("bulkUploadModalSubmit");
+  errorEl.textContent = "";
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Importing…";
+  try {
+    const res = await fetch("/api/buyers/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: bulkUploadParsedRows }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Bulk upload failed.");
+    const previewEl = document.getElementById("bulkUploadPreview");
+    previewEl.innerHTML = `
+      <div class="empty-state" style="text-align:left;padding:12px;">
+        <b style="color:var(--success);">${data.inserted} buyer${data.inserted === 1 ? "" : "s"} imported</b> with Source: Meta.
+        ${data.failedCount ? `<br><span style="color:var(--error);">${data.failedCount} row${data.failedCount === 1 ? "" : "s"} failed:</span>
+          <ul style="margin:6px 0 0 18px;font-size:12.5px;">
+            ${data.failed.map((f) => `<li>Row ${f.row}: ${esc(f.error)}</li>`).join("")}
+          </ul>` : ""}
+      </div>
+    `;
+    submitBtn.style.display = "none";
+    bulkUploadParsedRows = null;
+    if (currentView === "buyers") loadbuyers();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Import";
   }
 });
 

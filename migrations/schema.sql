@@ -95,6 +95,14 @@ CREATE TRIGGER badge_print_log_insert
   FOR EACH ROW
   EXECUTE FUNCTION trg_badge_print_log();
 
+-- 5) Lead source tracking — new column only this portal writes to.
+-- Every existing/registration-site row defaults to 'Website' (that's
+-- where the vast majority of registrations come from). The new "Bulk
+-- Upload" feature in the portal explicitly sets this to 'Meta' when
+-- importing a CSV (e.g. a Meta/Facebook lead-ads export), and the admin
+-- can change it to anything else from the Edit screen.
+ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'Website';
+
 -- 4) Sort-column indexes — every Buyers/Mart Owners page load sorts by
 -- these columns (newest first). Without an index Postgres has to sort
 -- the whole table on every request; this makes it instant regardless of
