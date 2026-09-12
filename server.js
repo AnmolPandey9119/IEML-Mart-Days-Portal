@@ -463,8 +463,9 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
 // loosely) and posts the already-mapped rows here as JSON. Every row
 // inserted this way:
 //   - is tagged ${COL.source} = "Meta" (the whole point of this feature)
-//   - gets a freshly generated URN, since bulk-uploaded leads never came
-//     from the registration site and so never had one
+//   - gets a freshly generated 6-character URN, same format as every
+//     other row, since bulk-uploaded leads never came from the
+//     registration site and so never had one
 // Every row in the file is imported, even if some fields are blank —
 // nothing is skipped just because a column was empty. The live
 // mart_days_registrations table has NOT NULL constraints on buyer_type,
@@ -486,8 +487,16 @@ const BULK_NOT_NULL_FIELDS = ["buyerType", "fullName", "companyName", "email", "
 const BULK_UPLOAD_SOURCE = "Meta";
 const BULK_MAX_ROWS = 5000;
 
+// Same style as the registration site's own URNs — a 6-character
+// uppercase alphanumeric code (e.g. "0KUKWL", "A7AXQ6") — so
+// bulk-uploaded buyers look identical to everyone else in the table.
+// ~36^6 (≈2.2 billion) possible codes, but collisions are still checked
+// for below and retried rather than assumed away.
+const URN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 function generateBulkUrn() {
-  return `META-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+  let out = "";
+  for (let i = 0; i < 6; i++) out += URN_CHARS[crypto.randomInt(URN_CHARS.length)];
+  return out;
 }
 
 app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
@@ -503,14 +512,14 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   for (let i = 0; i < rows.length; i++) {
     const raw = rows[i] || {};
     const cols = [COL.id, COL.source, COL.createdAt];
-    const values = [generateBulkUrn(), BULK_UPLOAD_SOURCE, new Date()];
+    const staticValues = [BULK_UPLOAD_SOURCE, new Date()]; // URN is generated per attempt below, prepended each time
 
     // NOT NULL columns — always included, blank becomes "" rather than
     // being omitted, so the row is never rejected over a missing value.
     for (const field of BULK_NOT_NULL_FIELDS) {
       const val = raw[field];
       cols.push(COL[field]);
-      values.push(val !== undefined && val !== null ? String(val).trim() : "");
+      staticValues.push(val !== undefined && val !== null ? String(val).trim() : "");
     }
     // Every other field — nullable on the live table, so only included
     // when the file actually had a value for it.
@@ -519,18 +528,30 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
       const val = raw[field];
       if (val === undefined || val === null || String(val).trim() === "") continue;
       cols.push(COL[field]);
-      values.push(String(val).trim());
+      staticValues.push(String(val).trim());
     }
 
-    const placeholders = values.map((_, idx) => `$${idx + 1}`);
-    try {
-      await pool.query(
-        `INSERT INTO ${buyers_TABLE} (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`,
-        values
-      );
-      inserted++;
-    } catch (err) {
-      failed.push({ row: i + 2, error: err.message });
+    const placeholders = cols.map((_, idx) => `$${idx + 1}`);
+    let rowInserted = false;
+    let lastErr = null;
+    // Up to 5 tries: a fresh random URN each attempt, in case of a
+    // (very unlikely) collision with an existing 6-character code.
+    for (let attempt = 0; attempt < 5 && !rowInserted; attempt++) {
+      const values = [generateBulkUrn(), ...staticValues];
+      try {
+        await pool.query(
+          `INSERT INTO ${buyers_TABLE} (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`,
+          values
+        );
+        rowInserted = true;
+        inserted++;
+      } catch (err) {
+        lastErr = err;
+        if (err.code !== "23505") break; // only worth retrying on a URN collision
+      }
+    }
+    if (!rowInserted) {
+      failed.push({ row: i + 2, error: lastErr ? lastErr.message : "Unknown error while inserting row." });
     }
   }
 
