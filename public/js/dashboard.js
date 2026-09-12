@@ -807,7 +807,8 @@ function openBulkUploadModal() {
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 12px;">
       Upload a CSV or Excel (.xlsx) file of buyers from an external source (e.g. a Meta / Facebook
       lead-ads export). Every row imported here is tagged <b>Source: Meta</b> automatically.
-      Required columns: Full Name, Company Name, Email, Phone.
+      Every row in the file is imported — even if some cells are blank, that row is still saved
+      (blank fields just come through empty rather than the row being skipped).
     </p>
     <p style="font-size:12.5px;margin:0 0 14px;">
       <a href="#" id="bulkUploadSampleLink">${ic('download')} Download a sample Excel template</a>

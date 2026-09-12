@@ -457,23 +457,32 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
-// Bulk Upload — imports buyers from an external CSV (e.g. a Meta /
-// Facebook lead-ads export). The frontend parses the CSV client-side
-// (so any reasonably-named column headers can be matched loosely) and
-// posts the already-mapped rows here as JSON. Every row inserted this
-// way:
+// Bulk Upload — imports buyers from an external CSV/Excel file (e.g. a
+// Meta / Facebook lead-ads export). The frontend parses the file
+// client-side (so any reasonably-named column headers can be matched
+// loosely) and posts the already-mapped rows here as JSON. Every row
+// inserted this way:
 //   - is tagged ${COL.source} = "Meta" (the whole point of this feature)
 //   - gets a freshly generated URN, since bulk-uploaded leads never came
 //     from the registration site and so never had one
-// Rows missing a required field are skipped and reported back, not
-// silently dropped — the rest of the batch still goes through.
+// Every row in the file is imported, even if some fields are blank —
+// nothing is skipped just because a column was empty. The live
+// mart_days_registrations table has NOT NULL constraints on buyer_type,
+// full_name, company_name, email, and phone_number specifically, so for
+// THOSE columns only, a blank cell is saved as an empty string rather
+// than being left out of the row (Postgres allows "", it just doesn't
+// allow NULL there) — every other field is simply left unset when blank.
+// A row only ever lands in "failed" for a genuine DB-level error.
 // ---------------------------------------------------------------------
 const BULK_UPLOAD_FIELDS = [
   "buyerType", "fullName", "companyName", "designation", "email", "phone",
   "address", "country", "state", "district", "pincode",
   "natureOfBusiness", "annualTurnover", "knownThrough", "onlineSeller", "productsOfInterest",
 ];
-const BULK_REQUIRED_FIELDS = ["fullName", "companyName", "email", "phone"];
+// These columns are NOT NULL on the live table — always included in the
+// INSERT (as "" if blank in the file) so a missing value here never
+// causes the whole row to fail or be skipped.
+const BULK_NOT_NULL_FIELDS = ["buyerType", "fullName", "companyName", "email", "phone"];
 const BULK_UPLOAD_SOURCE = "Meta";
 const BULK_MAX_ROWS = 5000;
 
@@ -493,19 +502,26 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
 
   for (let i = 0; i < rows.length; i++) {
     const raw = rows[i] || {};
-    const missing = BULK_REQUIRED_FIELDS.filter((f) => !raw[f] || !String(raw[f]).trim());
-    if (missing.length) {
-      failed.push({ row: i + 2, error: `Missing required field(s): ${missing.join(", ")}` }); // +2 accounts for the CSV header row + 1-indexing
-      continue;
-    }
     const cols = [COL.id, COL.source, COL.createdAt];
     const values = [generateBulkUrn(), BULK_UPLOAD_SOURCE, new Date()];
+
+    // NOT NULL columns — always included, blank becomes "" rather than
+    // being omitted, so the row is never rejected over a missing value.
+    for (const field of BULK_NOT_NULL_FIELDS) {
+      const val = raw[field];
+      cols.push(COL[field]);
+      values.push(val !== undefined && val !== null ? String(val).trim() : "");
+    }
+    // Every other field — nullable on the live table, so only included
+    // when the file actually had a value for it.
     for (const field of BULK_UPLOAD_FIELDS) {
+      if (BULK_NOT_NULL_FIELDS.includes(field)) continue;
       const val = raw[field];
       if (val === undefined || val === null || String(val).trim() === "") continue;
       cols.push(COL[field]);
       values.push(String(val).trim());
     }
+
     const placeholders = values.map((_, idx) => `$${idx + 1}`);
     try {
       await pool.query(
