@@ -204,7 +204,7 @@ const CHIP_INPUT_IDS = {
   city: "fCity", state: "fState", country: "fCountry",
   buyerType: "fBuyerType", source: "fSource", attended: "fAttended",
 };
-const SOURCE_OPTIONS = ["Website", "Meta", "Google", "Referral", "Walk-in", "Exhibitor Invite", "Other"];
+const SOURCE_OPTIONS = ["Website", "Meta", "Other"];
 const VISITOR_FIELD_LABELS = {
   urn: "URN", fullName: "Full Name", companyName: "Company Name", designation: "Designation",
   buyerType: "Buyer Type", source: "Source", email: "Email", phone: "Phone", address: "Address",
@@ -805,30 +805,31 @@ function openBulkUploadModal() {
 
   body.innerHTML = `
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 12px;">
-      Upload a CSV of buyers from an external source (e.g. a Meta / Facebook lead-ads export).
-      Every row imported here is tagged <b>Source: Meta</b> automatically.
+      Upload a CSV or Excel (.xlsx) file of buyers from an external source (e.g. a Meta / Facebook
+      lead-ads export). Every row imported here is tagged <b>Source: Meta</b> automatically.
       Required columns: Full Name, Company Name, Email, Phone.
     </p>
     <p style="font-size:12.5px;margin:0 0 14px;">
-      <a href="#" id="bulkUploadSampleLink">${ic('download')} Download a sample CSV template</a>
+      <a href="#" id="bulkUploadSampleLink">${ic('download')} Download a sample Excel template</a>
     </p>
     <div class="field full" style="margin-bottom:14px;">
-      <label>CSV File</label>
-      <input type="file" id="bulkUploadFileInput" accept=".csv,text/csv" />
+      <label>CSV or Excel File</label>
+      <input type="file" id="bulkUploadFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
     </div>
     <div id="bulkUploadPreview"></div>
   `;
 
   document.getElementById("bulkUploadSampleLink").addEventListener("click", (e) => {
     e.preventDefault();
-    const csv = BULK_UPLOAD_TEMPLATE_HEADERS.join(",") + "\n" +
-      "Jane Doe,Acme Traders,Purchase Manager,Overseas buyers,jane@acme.com,+1 555 0100,123 Main St,United States,,New York,10001,Home Decor,USD 1-5 Million,Social media,Yes,\"Furniture, Lighting\"\n";
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "buyer-bulk-upload-template.csv";
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    const sampleRows = [
+      BULK_UPLOAD_TEMPLATE_HEADERS,
+      ["Jane Doe", "Acme Traders", "Purchase Manager", "Overseas buyers", "jane@acme.com", "+1 555 0100", "123 Main St", "United States", "", "New York", "10001", "Home Decor", "USD 1-5 Million", "Social media", "Yes", "Furniture, Lighting"],
+      ["Rahul Sharma", "Sharma Exports", "Director", "Domestic volume buyers", "rahul@sharmaexports.in", "9876543210", "45 MG Road", "India", "Delhi", "New Delhi", "110001", "Handicrafts", "INR 1-5 Crore", "Advertisement", "No", "Home Textiles, Decor"],
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet(sampleRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Buyers");
+    XLSX.writeFile(workbook, "buyer-bulk-upload-template.xlsx");
   });
 
   document.getElementById("bulkUploadFileInput").addEventListener("change", (e) => {
@@ -840,48 +841,66 @@ function openBulkUploadModal() {
     previewEl.innerHTML = "";
     if (!file) return;
 
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const rows = parseCsv(String(reader.result));
-        if (rows.length < 2) throw new Error("CSV has no data rows.");
-        const headerRow = rows[0].map(normalizeHeader);
-        const mappedKeys = headerRow.map((h) => BULK_HEADER_ALIASES[h] || null);
-        if (!mappedKeys.includes("fullName") || !mappedKeys.includes("companyName") ||
-            !mappedKeys.includes("email") || !mappedKeys.includes("phone")) {
-          throw new Error('CSV must include columns for Full Name, Company Name, Email, and Phone (names are matched loosely — "Name", "Company", "Mobile" etc. also work).');
+        let rows;
+        if (isExcel) {
+          const workbook = XLSX.read(new Uint8Array(reader.result), { type: "array" });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false })
+            .map((r) => r.map((c) => (c === undefined || c === null ? "" : String(c))))
+            .filter((r) => !(r.length === 0 || (r.length === 1 && r[0].trim() === "")));
+        } else {
+          rows = parseCsv(String(reader.result));
         }
-        const parsed = [];
-        for (let r = 1; r < rows.length; r++) {
-          const cells = rows[r];
-          if (cells.every((c) => !c || !c.trim())) continue;
-          const obj = {};
-          mappedKeys.forEach((key, idx) => {
-            if (!key) return;
-            const val = (cells[idx] || "").trim();
-            if (val) obj[key] = val;
-          });
-          if (Object.keys(obj).length) parsed.push(obj);
-        }
-        if (parsed.length === 0) throw new Error("No usable data rows found in this CSV.");
-        bulkUploadParsedRows = parsed;
-        const unmapped = rows[0].filter((_, idx) => !mappedKeys[idx]);
-        previewEl.innerHTML = `
-          <div class="empty-state" style="text-align:left;padding:12px;">
-            <b>${parsed.length} row${parsed.length === 1 ? "" : "s"}</b> ready to import, all tagged <b>Source: Meta</b>.
-            ${unmapped.length ? `<br><span style="font-size:12px;color:var(--muted);">Columns not recognised (ignored): ${unmapped.map(esc).join(", ")}</span>` : ""}
-          </div>
-        `;
-        submitBtn.style.display = "inline-block";
+        bulkUploadHandleParsedRows(rows, previewEl, errorEl, submitBtn);
       } catch (err) {
         errorEl.textContent = err.message;
       }
     };
     reader.onerror = () => { errorEl.textContent = "Could not read that file."; };
-    reader.readAsText(file);
+    if (isExcel) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
   });
 
   backdrop.classList.add("show");
+}
+
+// Shared row-mapping logic for both CSV and Excel input — both are
+// normalised to an array-of-arrays of strings (rows[0] = headers) before
+// reaching here.
+function bulkUploadHandleParsedRows(rows, previewEl, errorEl, submitBtn) {
+  if (rows.length < 2) throw new Error("File has no data rows.");
+  const headerRow = rows[0].map(normalizeHeader);
+  const mappedKeys = headerRow.map((h) => BULK_HEADER_ALIASES[h] || null);
+  if (!mappedKeys.includes("fullName") || !mappedKeys.includes("companyName") ||
+      !mappedKeys.includes("email") || !mappedKeys.includes("phone")) {
+    throw new Error('File must include columns for Full Name, Company Name, Email, and Phone (names are matched loosely — "Name", "Company", "Mobile" etc. also work).');
+  }
+  const parsed = [];
+  for (let r = 1; r < rows.length; r++) {
+    const cells = rows[r];
+    if (cells.every((c) => !c || !String(c).trim())) continue;
+    const obj = {};
+    mappedKeys.forEach((key, idx) => {
+      if (!key) return;
+      const val = (cells[idx] || "").toString().trim();
+      if (val) obj[key] = val;
+    });
+    if (Object.keys(obj).length) parsed.push(obj);
+  }
+  if (parsed.length === 0) throw new Error("No usable data rows found in this file.");
+  bulkUploadParsedRows = parsed;
+  const unmapped = rows[0].filter((_, idx) => !mappedKeys[idx]);
+  previewEl.innerHTML = `
+    <div class="empty-state" style="text-align:left;padding:12px;">
+      <b>${parsed.length} row${parsed.length === 1 ? "" : "s"}</b> ready to import, all tagged <b>Source: Meta</b>.
+      ${unmapped.length ? `<br><span style="font-size:12px;color:var(--muted);">Columns not recognised (ignored): ${unmapped.map(esc).join(", ")}</span>` : ""}
+    </div>
+  `;
+  submitBtn.style.display = "inline-block";
 }
 
 document.getElementById("bulkUploadModalCancel").addEventListener("click", () => {

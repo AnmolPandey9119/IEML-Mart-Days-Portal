@@ -103,7 +103,7 @@ const EDITABLE_VISITOR_FIELDS = [
 // Dropdown options offered for the "Source" field (filter + edit). Not
 // enforced strictly server-side — an existing/unusual value already on a
 // row is always preserved and shown as an extra option by the frontend.
-const SOURCE_VALUES = ["Website", "Meta", "Google", "Referral", "Walk-in", "Exhibitor Invite", "Other"];
+const SOURCE_VALUES = ["Website", "Meta", "Other"];
 // Columns actually shown/searchable in the buyers table (in this order).
 const VISITOR_LIST_COLUMNS = [
   { key: "urn", label: "URN" },
