@@ -109,3 +109,24 @@ ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS source TEXT NOT NUL
 -- how many rows accumulate over the event.
 CREATE INDEX IF NOT EXISTS idx_mart_days_registered_at ON mart_days_registrations (registered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_mart_owners_created_at ON mart_owners (created_at DESC);
+
+-- 6) Bulk Upload batches — every row inserted via Bulk Upload is tagged
+-- with the batch it came from, and each batch is logged in its own
+-- table. This is what makes "Revert this bulk upload" possible: instead
+-- of hunting down and deleting rows one by one after a wrong file gets
+-- imported, the whole batch can be removed in one click by its
+-- bulk_batch_id.
+ALTER TABLE mart_days_registrations ADD COLUMN IF NOT EXISTS bulk_batch_id UUID;
+CREATE INDEX IF NOT EXISTS idx_mart_days_bulk_batch_id ON mart_days_registrations (bulk_batch_id);
+
+CREATE TABLE IF NOT EXISTS bulk_upload_batches (
+  id UUID PRIMARY KEY,
+  source TEXT NOT NULL,
+  inserted_count INT NOT NULL DEFAULT 0,
+  duplicate_count INT NOT NULL DEFAULT 0,
+  failed_count INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  reverted_at TIMESTAMPTZ,
+  reverted_count INT
+);
+CREATE INDEX IF NOT EXISTS idx_bulk_upload_batches_created_at ON bulk_upload_batches (created_at DESC);

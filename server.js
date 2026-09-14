@@ -74,8 +74,13 @@ const COL = {
   // Also added by migrations/schema.sql — registration approval workflow.
   status: "status",
   // Also added by migrations/schema.sql — lead source ("Website" by
-  // default; "Meta" for anything brought in via Bulk Upload).
+  // default; "Meta" or "WhatsApp" for anything brought in via Bulk
+  // Upload, depending which the admin picks at upload time).
   source: "source",
+  // Also added by migrations/schema.sql — which Bulk Upload batch this
+  // row came from (NULL for rows that were never bulk-uploaded). Lets a
+  // whole batch be reverted later by id — see bulk_upload_batches below.
+  bulkBatchId: "bulk_batch_id",
   // Business/interest details collected by the registration form.
   natureOfBusiness: "nature_of_business",
   annualTurnover: "annual_turnover",
@@ -458,11 +463,15 @@ app.get("/api/buyers/export", requireAuth, async (req, res) => {
 
 // ---------------------------------------------------------------------
 // Bulk Upload — imports buyers from an external CSV/Excel file (e.g. a
-// Meta / Facebook lead-ads export). The frontend parses the file
-// client-side (so any reasonably-named column headers can be matched
-// loosely) and posts the already-mapped rows here as JSON. Every row
-// inserted this way:
-//   - is tagged ${COL.source} = "Meta" (the whole point of this feature)
+// Meta / Facebook lead-ads export, or a WhatsApp-collected list). The
+// frontend parses the file client-side (so any reasonably-named column
+// headers can be matched loosely) and posts the already-mapped rows
+// here as JSON, along with which source this batch came from. Every
+// row inserted this way:
+//   - is tagged ${COL.source} = the chosen source ("Meta" or "WhatsApp")
+//   - is tagged ${COL.bulkBatchId} with a fresh id shared by every row
+//     in this one upload, so the whole batch can be found (and
+//     reverted) later as a unit
 //   - gets a freshly generated 6-character URN, same format as every
 //     other row, since bulk-uploaded leads never came from the
 //     registration site and so never had one
@@ -484,7 +493,9 @@ const BULK_UPLOAD_FIELDS = [
 // INSERT (as "" if blank in the file) so a missing value here never
 // causes the whole row to fail or be skipped.
 const BULK_NOT_NULL_FIELDS = ["buyerType", "fullName", "companyName", "email", "phone"];
-const BULK_UPLOAD_SOURCE = "Meta";
+// The only two sources a bulk-uploaded batch can be tagged with — the
+// admin picks one in the upload modal before the file is even parsed.
+const BULK_UPLOAD_SOURCES = ["Meta", "WhatsApp"];
 const BULK_MAX_ROWS = 5000;
 
 // Same style as the registration site's own URNs — a 6-character
@@ -525,10 +536,15 @@ function normalizePhoneForDupeCheck(val) {
 
 app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
+  const source = req.body && req.body.source;
+  if (!BULK_UPLOAD_SOURCES.includes(source)) {
+    return res.status(400).json({ error: `source must be one of: ${BULK_UPLOAD_SOURCES.join(", ")}.` });
+  }
   if (rows.length === 0) return res.status(400).json({ error: "No rows to import." });
   if (rows.length > BULK_MAX_ROWS) {
     return res.status(400).json({ error: `Too many rows in one upload (max ${BULK_MAX_ROWS}).` });
   }
+  const batchId = crypto.randomUUID();
 
   // Pull existing emails/phones once up front so every row in this
   // batch can be checked in memory rather than one query per row.
@@ -569,8 +585,8 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     if (normEmail) seenEmails.add(normEmail);
     if (normPhone) seenPhones.add(normPhone);
 
-    const cols = [COL.id, COL.source, COL.createdAt];
-    const staticValues = [BULK_UPLOAD_SOURCE, new Date()]; // URN is generated per attempt below, prepended each time
+    const cols = [COL.id, COL.source, COL.bulkBatchId, COL.createdAt];
+    const staticValues = [source, batchId, new Date()]; // URN is generated per attempt below, prepended each time
 
     // NOT NULL columns — always included, blank becomes "" rather than
     // being omitted, so the row is never rejected over a missing value.
@@ -613,14 +629,125 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     }
   }
 
+  // Log the batch itself (even if 0 rows ended up inserted, e.g. every
+  // row in the file turned out to be a duplicate) so it still shows up
+  // in Bulk Upload History with an accurate picture of what happened.
+  try {
+    await pool.query(
+      `INSERT INTO bulk_upload_batches (id, source, inserted_count, duplicate_count, failed_count)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [batchId, source, inserted, duplicates.length, failed.length]
+    );
+  } catch (err) {
+    console.error("could not log bulk upload batch:", err.message);
+    // not fatal — the rows themselves are already inserted successfully
+  }
+
   res.json({
     success: true,
+    batchId,
     inserted,
     failedCount: failed.length,
     failed: failed.slice(0, 50),
     duplicateCount: duplicates.length,
     duplicates: duplicates.slice(0, 50),
   });
+});
+
+// ---------------------------------------------------------------------
+// Bulk Upload History — lists every batch ever imported via Bulk
+// Upload, newest first, with a live count of how many of its rows are
+// still in the buyers table right now (current_count). That live count
+// is what the frontend uses to decide whether "Revert" makes sense for
+// a batch — a batch already reverted (or one where every row has since
+// been deleted individually) has nothing left to revert.
+// ---------------------------------------------------------------------
+app.get("/api/buyers/bulk/batches", requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT b.id, b.source, b.inserted_count, b.duplicate_count, b.failed_count,
+             b.created_at, b.reverted_at, b.reverted_count,
+             COUNT(m.${COL.id})::int AS current_count
+      FROM bulk_upload_batches b
+      LEFT JOIN ${buyers_TABLE} m ON m.${COL.bulkBatchId} = b.id
+      GROUP BY b.id
+      ORDER BY b.created_at DESC
+      LIMIT 200
+    `);
+    res.json({ batches: result.rows });
+  } catch (err) {
+    console.error("list bulk upload batches failed:", err.message);
+    res.status(500).json({ error: "Could not load bulk upload history.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Revert a Bulk Upload — deletes every buyer row still tagged with this
+// batch's id (so if a wrong file gets imported, it can be undone in one
+// click instead of finding and deleting rows by hand). Rows from this
+// batch that were already individually edited/deleted are simply no
+// longer part of the count. Safe to call again on an already-reverted
+// batch — it will just report 0 rows removed the second time.
+// ---------------------------------------------------------------------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.post("/api/buyers/bulk/:batchId/revert", requireAuth, async (req, res) => {
+  const { batchId } = req.params;
+  if (!UUID_RE.test(batchId)) {
+    return res.status(400).json({ error: "Invalid batch id." });
+  }
+  try {
+    const batch = await pool.query(`SELECT id FROM bulk_upload_batches WHERE id = $1`, [batchId]);
+    if (batch.rows.length === 0) {
+      return res.status(404).json({ error: "Bulk upload batch not found." });
+    }
+    const deleted = await pool.query(
+      `DELETE FROM ${buyers_TABLE} WHERE ${COL.bulkBatchId} = $1`,
+      [batchId]
+    );
+    await pool.query(
+      `UPDATE bulk_upload_batches SET reverted_at = now(), reverted_count = $2 WHERE id = $1`,
+      [batchId, deleted.rowCount]
+    );
+    res.json({ success: true, deletedCount: deleted.rowCount });
+  } catch (err) {
+    console.error("revert bulk upload batch failed:", err.message);
+    res.status(500).json({ error: "Could not revert this bulk upload.", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Delete all buyers with a given Source — the cleanup tool for rows
+// that predate Bulk Upload batch-tracking (or any other case where you
+// just want every row of one source gone, not a specific batch).
+// GET first to show the admin exactly how many rows are about to be
+// deleted before they commit to the DELETE, mirroring the two-step
+// pattern used everywhere else destructive in this portal.
+// ---------------------------------------------------------------------
+app.get("/api/buyers/by-source/count", requireAuth, async (req, res) => {
+  const source = (req.query.source || "").toString().trim();
+  if (!source) return res.status(400).json({ error: "source is required." });
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM ${buyers_TABLE} WHERE ${COL.source} = $1`,
+      [source]
+    );
+    res.json({ count: result.rows[0].count });
+  } catch (err) {
+    console.error("count buyers by source failed:", err.message);
+    res.status(500).json({ error: "Could not count buyers for that source.", detail: err.message });
+  }
+});
+
+app.delete("/api/buyers/by-source", requireAuth, async (req, res) => {
+  const source = ((req.body && req.body.source) || "").toString().trim();
+  if (!source) return res.status(400).json({ error: "source is required." });
+  try {
+    const result = await pool.query(`DELETE FROM ${buyers_TABLE} WHERE ${COL.source} = $1`, [source]);
+    res.json({ success: true, deletedCount: result.rowCount });
+  } catch (err) {
+    console.error("delete buyers by source failed:", err.message);
+    res.status(500).json({ error: "Could not delete buyers for that source.", detail: err.message });
+  }
 });
 
 app.get("/api/analytics/buyers", requireAuth, async (req, res) => {

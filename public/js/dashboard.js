@@ -234,9 +234,13 @@ function renderbuyers() {
   pageTitle.textContent = "Buyers";
   headerActions.innerHTML = `
     <button class="btn" id="bulkUploadBtn">${ic('upload')} Bulk Upload</button>
+    <button class="btn" id="bulkHistoryBtn">${ic('clock')} Bulk Upload History</button>
+    <button class="btn danger" id="deleteBySourceBtn">${ic('trash')} Delete by Source</button>
     <button class="btn" id="exportBtn">${ic('download')} Export CSV</button>
   `;
   document.getElementById("bulkUploadBtn").addEventListener("click", openBulkUploadModal);
+  document.getElementById("bulkHistoryBtn").addEventListener("click", openBulkHistoryModal);
+  document.getElementById("deleteBySourceBtn").addEventListener("click", openDeleteBySourceModal);
   document.getElementById("exportBtn").addEventListener("click", () => {
     window.location.href = "/api/buyers/export?" + visitorFilterParams().toString();
   });
@@ -800,9 +804,12 @@ function parseCsv(text) {
 }
 
 let bulkUploadParsedRows = null;
+let bulkUploadSelectedSource = "";
+const BULK_UPLOAD_SOURCES = ["Meta", "WhatsApp"];
 
 function openBulkUploadModal() {
   bulkUploadParsedRows = null;
+  bulkUploadSelectedSource = "";
   const backdrop = document.getElementById("bulkUploadModalBackdrop");
   const body = document.getElementById("bulkUploadModalBody");
   const errorEl = document.getElementById("bulkUploadModalError");
@@ -815,19 +822,38 @@ function openBulkUploadModal() {
   body.innerHTML = `
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 12px;">
       Upload a CSV or Excel (.xlsx) file of buyers from an external source (e.g. a Meta / Facebook
-      lead-ads export). Every row imported here is tagged <b>Source: Meta</b> automatically.
-      Every row in the file is imported — even if some cells are blank, that row is still saved
-      (blank fields just come through empty rather than the row being skipped).
+      lead-ads export, or a list collected over WhatsApp). Every row imported here is tagged with
+      whichever source you pick below. Every row in the file is imported — even if some cells are
+      blank, that row is still saved (blank fields just come through empty rather than the row
+      being skipped).
     </p>
     <p style="font-size:12.5px;margin:0 0 14px;">
       <a href="#" id="bulkUploadSampleLink">${ic('download')} Download a sample Excel template</a>
     </p>
     <div class="field full" style="margin-bottom:14px;">
+      <label>Source</label>
+      <select id="bulkUploadSourceSelect">
+        <option value="">Select a source…</option>
+        ${BULK_UPLOAD_SOURCES.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field full" style="margin-bottom:14px;">
       <label>CSV or Excel File</label>
-      <input type="file" id="bulkUploadFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
+      <input type="file" id="bulkUploadFileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" disabled />
     </div>
     <div id="bulkUploadPreview"></div>
   `;
+
+  const fileInput = document.getElementById("bulkUploadFileInput");
+  document.getElementById("bulkUploadSourceSelect").addEventListener("change", (e) => {
+    bulkUploadSelectedSource = e.target.value;
+    fileInput.disabled = !bulkUploadSelectedSource;
+    // Changing the source after a file was already parsed just re-tags
+    // the pending preview — no need to re-pick the file.
+    if (bulkUploadParsedRows) {
+      submitBtn.style.display = bulkUploadSelectedSource ? "inline-block" : "none";
+    }
+  });
 
   document.getElementById("bulkUploadSampleLink").addEventListener("click", (e) => {
     e.preventDefault();
@@ -906,11 +932,11 @@ function bulkUploadHandleParsedRows(rows, previewEl, errorEl, submitBtn) {
   const unmapped = rows[0].filter((_, idx) => !mappedKeys[idx]);
   previewEl.innerHTML = `
     <div class="empty-state" style="text-align:left;padding:12px;">
-      <b>${parsed.length} row${parsed.length === 1 ? "" : "s"}</b> ready to import, all tagged <b>Source: Meta</b>.
+      <b>${parsed.length} row${parsed.length === 1 ? "" : "s"}</b> ready to import, all tagged <b>Source: ${esc(bulkUploadSelectedSource)}</b>.
       ${unmapped.length ? `<br><span style="font-size:12px;color:var(--muted);">Columns not recognised (ignored): ${unmapped.map(esc).join(", ")}</span>` : ""}
     </div>
   `;
-  submitBtn.style.display = "inline-block";
+  submitBtn.style.display = bulkUploadSelectedSource ? "inline-block" : "none";
 }
 
 document.getElementById("bulkUploadModalCancel").addEventListener("click", () => {
@@ -922,24 +948,29 @@ document.getElementById("bulkUploadModalSubmit").addEventListener("click", async
   const errorEl = document.getElementById("bulkUploadModalError");
   const submitBtn = document.getElementById("bulkUploadModalSubmit");
   errorEl.textContent = "";
+  if (!bulkUploadSelectedSource) {
+    errorEl.textContent = "Pick a source (Meta or WhatsApp) before importing.";
+    return;
+  }
   submitBtn.disabled = true;
   submitBtn.textContent = "Importing…";
   try {
     const res = await fetch("/api/buyers/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows: bulkUploadParsedRows }),
+      body: JSON.stringify({ rows: bulkUploadParsedRows, source: bulkUploadSelectedSource }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Bulk upload failed.");
     const previewEl = document.getElementById("bulkUploadPreview");
+    // Duplicates are only ever skipped for a mechanical reason (email or
+    // phone already exists) — a count is enough here, no need to list
+    // every single row. The Bulk Upload History panel has a Revert
+    // button in case the whole batch needs undoing instead.
     previewEl.innerHTML = `
       <div class="empty-state" style="text-align:left;padding:12px;">
-        <b style="color:var(--success);">${data.inserted} buyer${data.inserted === 1 ? "" : "s"} imported</b> with Source: Meta.
-        ${data.duplicateCount ? `<br><span style="color:var(--warning, #b8860b);">${data.duplicateCount} row${data.duplicateCount === 1 ? "" : "s"} skipped as duplicates (matched by email/phone):</span>
-          <ul style="margin:6px 0 0 18px;font-size:12.5px;">
-            ${data.duplicates.map((d) => `<li>Row ${d.row}: ${esc(d.error)}${d.email ? ` — ${esc(d.email)}` : ""}${d.phone ? ` / ${esc(d.phone)}` : ""}</li>`).join("")}
-          </ul>` : ""}
+        <b style="color:var(--success);">${data.inserted} buyer${data.inserted === 1 ? "" : "s"} imported</b> with Source: ${esc(bulkUploadSelectedSource)}.
+        ${data.duplicateCount ? `<br><span style="color:var(--warning, #b8860b);">${data.duplicateCount} row${data.duplicateCount === 1 ? "" : "s"} skipped as duplicates (email or phone already exists).</span>` : ""}
         ${data.failedCount ? `<br><span style="color:var(--error);">${data.failedCount} row${data.failedCount === 1 ? "" : "s"} failed:</span>
           <ul style="margin:6px 0 0 18px;font-size:12.5px;">
             ${data.failed.map((f) => `<li>Row ${f.row}: ${esc(f.error)}</li>`).join("")}
@@ -954,6 +985,165 @@ document.getElementById("bulkUploadModalSubmit").addEventListener("click", async
     submitBtn.disabled = false;
     submitBtn.textContent = "Import";
   }
+});
+
+// ---------------------------------------------------------------------
+// Bulk Upload History — lists every batch ever imported via Bulk
+// Upload, each with a "Revert" button that removes exactly the rows
+// that batch inserted. This is the safety net for a wrong upload: no
+// need to hunt down rows by hand, just revert the whole batch.
+// ---------------------------------------------------------------------
+async function openBulkHistoryModal() {
+  const backdrop = document.getElementById("bulkHistoryModalBackdrop");
+  const body = document.getElementById("bulkHistoryModalBody");
+  body.innerHTML = `<div class="loading-state">Loading…</div>`;
+  backdrop.classList.add("show");
+  try {
+    const res = await fetch("/api/buyers/bulk/batches");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not load bulk upload history.");
+    renderBulkHistoryList(data.batches || []);
+  } catch (err) {
+    body.innerHTML = `<div class="modal-error">${esc(err.message)}</div>`;
+  }
+}
+
+document.getElementById("bulkHistoryModalCancel").addEventListener("click", () => {
+  document.getElementById("bulkHistoryModalBackdrop").classList.remove("show");
+});
+
+function renderBulkHistoryList(batches) {
+  const body = document.getElementById("bulkHistoryModalBody");
+  if (batches.length === 0) {
+    body.innerHTML = `<div class="empty-state">No bulk uploads yet.</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Source</th><th>Imported</th><th>Duplicates</th><th>Still in DB</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${batches.map((b) => `
+            <tr>
+              <td>${fmtDate(b.created_at)}</td>
+              <td>${esc(b.source)}</td>
+              <td>${b.inserted_count}</td>
+              <td>${b.duplicate_count}</td>
+              <td>${b.current_count}</td>
+              <td>${b.reverted_at ? `Reverted (${b.reverted_count ?? 0} removed)` : "Active"}</td>
+              <td>${(!b.reverted_at && b.current_count > 0) ? `<button class="btn danger" data-batch="${esc(b.id)}">${ic('trash')} Revert</button>` : ""}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  body.querySelectorAll("button[data-batch]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const batchId = btn.getAttribute("data-batch");
+      const row = batches.find((b) => b.id === batchId);
+      openDangerConfirmModal(
+        `This will permanently remove ${row.current_count} buyer${row.current_count === 1 ? "" : "s"} imported in this ${row.source} bulk upload from ${fmtDate(row.created_at)}. This cannot be undone.`,
+        async () => {
+          const res = await fetch(`/api/buyers/bulk/${batchId}/revert`, { method: "POST" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not revert this bulk upload.");
+          return data;
+        },
+        () => {
+          openBulkHistoryModal();
+          if (currentView === "buyers") loadbuyers();
+        }
+      );
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
+// Delete by Source — for cleaning up rows that predate Bulk Upload's
+// batch tracking (e.g. old uploads from before this feature existed),
+// or any other case where every row of one source should just be gone.
+// Unlike Revert, this isn't scoped to a single batch — it removes every
+// buyer row with the chosen source, however it got there. Shows a live
+// count before anything is deleted, then still goes through the same
+// two-click danger-confirm popup as everything else destructive here.
+// ---------------------------------------------------------------------
+function openDeleteBySourceModal() {
+  const backdrop = document.getElementById("deleteBySourceModalBackdrop");
+  const body = document.getElementById("deleteBySourceModalBody");
+  const errorEl = document.getElementById("deleteBySourceModalError");
+  const submitBtn = document.getElementById("deleteBySourceModalSubmit");
+  errorEl.textContent = "";
+  submitBtn.style.display = "none";
+  let currentCount = 0;
+
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 14px;">
+      Permanently deletes every buyer row tagged with the source you pick below — the whole
+      source, not just one upload. Useful for clearing out an old bulk import that happened
+      before Bulk Upload History existed.
+    </p>
+    <div class="field full" style="margin-bottom:10px;">
+      <label>Source</label>
+      <select id="deleteBySourceSelect">
+        <option value="">Select a source…</option>
+        ${SOURCE_OPTIONS.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}
+      </select>
+    </div>
+    <div id="deleteBySourceCount" style="font-size:13px;color:var(--muted);"></div>
+  `;
+  backdrop.classList.add("show");
+
+  const select = document.getElementById("deleteBySourceSelect");
+  const countEl = document.getElementById("deleteBySourceCount");
+
+  select.addEventListener("change", async () => {
+    errorEl.textContent = "";
+    submitBtn.style.display = "none";
+    countEl.textContent = "";
+    currentCount = 0;
+    const source = select.value;
+    if (!source) return;
+    countEl.textContent = "Counting…";
+    try {
+      const res = await fetch("/api/buyers/by-source/count?source=" + encodeURIComponent(source));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not count buyers for that source.");
+      currentCount = data.count;
+      countEl.innerHTML = `<b>${data.count}</b> buyer${data.count === 1 ? "" : "s"} currently tagged Source: ${esc(source)}.`;
+      submitBtn.style.display = data.count > 0 ? "inline-block" : "none";
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  submitBtn.onclick = () => {
+    const source = select.value;
+    if (!source || currentCount === 0) return;
+    openDangerConfirmModal(
+      `This will permanently delete all ${currentCount} buyer${currentCount === 1 ? "" : "s"} tagged Source: ${source}. This cannot be undone.`,
+      async () => {
+        const res = await fetch("/api/buyers/by-source", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not delete buyers for that source.");
+        return data;
+      },
+      () => {
+        backdrop.classList.remove("show");
+        if (currentView === "buyers") loadbuyers();
+      }
+    );
+  };
+}
+
+document.getElementById("deleteBySourceModalCancel").addEventListener("click", () => {
+  document.getElementById("deleteBySourceModalBackdrop").classList.remove("show");
 });
 
 // ---------------------------------------------------------------------
