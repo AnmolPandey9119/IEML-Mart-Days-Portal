@@ -204,7 +204,7 @@ const CHIP_INPUT_IDS = {
   city: "fCity", state: "fState", country: "fCountry",
   buyerType: "fBuyerType", source: "fSource", attended: "fAttended",
 };
-const SOURCE_OPTIONS = ["Website", "Meta", "Other"];
+const SOURCE_OPTIONS = ["Website", "Meta", "WhatsApp", "Other"];
 const VISITOR_FIELD_LABELS = {
   urn: "URN", fullName: "Full Name", companyName: "Company Name", designation: "Designation",
   buyerType: "Buyer Type", source: "Source", email: "Email", phone: "Phone", address: "Address",
@@ -936,6 +936,10 @@ document.getElementById("bulkUploadModalSubmit").addEventListener("click", async
     previewEl.innerHTML = `
       <div class="empty-state" style="text-align:left;padding:12px;">
         <b style="color:var(--success);">${data.inserted} buyer${data.inserted === 1 ? "" : "s"} imported</b> with Source: Meta.
+        ${data.duplicateCount ? `<br><span style="color:var(--warning, #b8860b);">${data.duplicateCount} row${data.duplicateCount === 1 ? "" : "s"} skipped as duplicates (matched by email/phone):</span>
+          <ul style="margin:6px 0 0 18px;font-size:12.5px;">
+            ${data.duplicates.map((d) => `<li>Row ${d.row}: ${esc(d.error)}${d.email ? ` — ${esc(d.email)}` : ""}${d.phone ? ` / ${esc(d.phone)}` : ""}</li>`).join("")}
+          </ul>` : ""}
         ${data.failedCount ? `<br><span style="color:var(--error);">${data.failedCount} row${data.failedCount === 1 ? "" : "s"} failed:</span>
           <ul style="margin:6px 0 0 18px;font-size:12.5px;">
             ${data.failed.map((f) => `<li>Row ${f.row}: ${esc(f.error)}</li>`).join("")}

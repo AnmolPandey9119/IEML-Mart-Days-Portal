@@ -103,7 +103,7 @@ const EDITABLE_VISITOR_FIELDS = [
 // Dropdown options offered for the "Source" field (filter + edit). Not
 // enforced strictly server-side — an existing/unusual value already on a
 // row is always preserved and shown as an extra option by the frontend.
-const SOURCE_VALUES = ["Website", "Meta", "Other"];
+const SOURCE_VALUES = ["Website", "Meta", "WhatsApp", "Other"];
 // Columns actually shown/searchable in the buyers table (in this order).
 const VISITOR_LIST_COLUMNS = [
   { key: "urn", label: "URN" },
@@ -499,6 +499,30 @@ function generateBulkUrn() {
   return out;
 }
 
+// ---------------------------------------------------------------------
+// Duplicate detection for Bulk Upload — scans by email and phone number
+// (not name/company, which legitimately repeat). Phone numbers are
+// normalised before comparing since the same visitor's number often
+// shows up with/without a country code, spaces, dashes, or a leading 0
+// (e.g. "+91 98765 43210", "0-9876543210", "9876543210" should all be
+// treated as the same number) — we strip everything but digits and keep
+// the last 10 digits (standard Indian mobile length) as the comparison
+// key. Email is compared trimmed + lowercased. A row is flagged as a
+// duplicate if EITHER its email or its phone matches something already
+// in the buyers table, or matches an earlier row in the same file —
+// duplicate rows are skipped (not inserted) and reported back so
+// nothing silently vanishes.
+// ---------------------------------------------------------------------
+function normalizeEmailForDupeCheck(val) {
+  const s = (val === undefined || val === null) ? "" : String(val).trim().toLowerCase();
+  return s || null;
+}
+function normalizePhoneForDupeCheck(val) {
+  const digits = (val === undefined || val === null) ? "" : String(val).replace(/\D/g, "");
+  if (!digits) return null;
+  return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
 app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
   if (rows.length === 0) return res.status(400).json({ error: "No rows to import." });
@@ -506,11 +530,45 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     return res.status(400).json({ error: `Too many rows in one upload (max ${BULK_MAX_ROWS}).` });
   }
 
+  // Pull existing emails/phones once up front so every row in this
+  // batch can be checked in memory rather than one query per row.
+  const seenEmails = new Set();
+  const seenPhones = new Set();
+  try {
+    const existing = await pool.query(`SELECT ${COL.email} AS email, ${COL.phone} AS phone FROM ${buyers_TABLE}`);
+    for (const r of existing.rows) {
+      const e = normalizeEmailForDupeCheck(r.email);
+      const p = normalizePhoneForDupeCheck(r.phone);
+      if (e) seenEmails.add(e);
+      if (p) seenPhones.add(p);
+    }
+  } catch (err) {
+    return res.status(500).json({ error: "Could not check existing buyers for duplicates.", detail: err.message });
+  }
+
   let inserted = 0;
   const failed = [];
+  const duplicates = [];
 
   for (let i = 0; i < rows.length; i++) {
     const raw = rows[i] || {};
+
+    const normEmail = normalizeEmailForDupeCheck(raw.email);
+    const normPhone = normalizePhoneForDupeCheck(raw.phone);
+    const emailDupe = normEmail && seenEmails.has(normEmail);
+    const phoneDupe = normPhone && seenPhones.has(normPhone);
+    if (emailDupe || phoneDupe) {
+      const reason = emailDupe && phoneDupe ? "email and phone already exist"
+        : emailDupe ? "email already exists" : "phone number already exists";
+      duplicates.push({ row: i + 2, error: reason, email: raw.email || "", phone: raw.phone || "" });
+      continue; // skip inserting this row entirely
+    }
+    // Mark as seen immediately (not just after a successful insert) so
+    // a second copy of the same lead later in the same file is also
+    // caught as a duplicate, not inserted twice.
+    if (normEmail) seenEmails.add(normEmail);
+    if (normPhone) seenPhones.add(normPhone);
+
     const cols = [COL.id, COL.source, COL.createdAt];
     const staticValues = [BULK_UPLOAD_SOURCE, new Date()]; // URN is generated per attempt below, prepended each time
 
@@ -555,7 +613,14 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     }
   }
 
-  res.json({ success: true, inserted, failedCount: failed.length, failed: failed.slice(0, 50) });
+  res.json({
+    success: true,
+    inserted,
+    failedCount: failed.length,
+    failed: failed.slice(0, 50),
+    duplicateCount: duplicates.length,
+    duplicates: duplicates.slice(0, 50),
+  });
 });
 
 app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
