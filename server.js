@@ -421,6 +421,43 @@ app.patch("/api/buyers/:id", requireAuth, async (req, res) => {
   }
 });
 
+// Delete Buyers by Source — the cleanup tool for rows that predate
+// Bulk Upload batch-tracking (or any other case where you just want
+// every row of one source gone, not a specific batch). Registered
+// BEFORE the generic "/api/buyers/:id" routes below on purpose: Express
+// matches routes in registration order, and "/api/buyers/:id" would
+// otherwise swallow "/api/buyers/by-source" by treating "by-source" as
+// the :id value, 404-ing with "Visitor not found" before this code ever
+// runs. GET first shows the admin exactly how many rows are about to
+// be deleted before they commit to the DELETE, mirroring the two-step
+// pattern used everywhere else destructive in this portal.
+app.get("/api/buyers/by-source/count", requireAuth, async (req, res) => {
+  const source = (req.query.source || "").toString().trim();
+  if (!source) return res.status(400).json({ error: "source is required." });
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM ${buyers_TABLE} WHERE ${COL.source} = $1`,
+      [source]
+    );
+    res.json({ count: result.rows[0].count });
+  } catch (err) {
+    console.error("count buyers by source failed:", err.message);
+    res.status(500).json({ error: "Could not count buyers for that source.", detail: err.message });
+  }
+});
+
+app.delete("/api/buyers/by-source", requireAuth, async (req, res) => {
+  const source = ((req.body && req.body.source) || "").toString().trim();
+  if (!source) return res.status(400).json({ error: "source is required." });
+  try {
+    const result = await pool.query(`DELETE FROM ${buyers_TABLE} WHERE ${COL.source} = $1`, [source]);
+    res.json({ success: true, deletedCount: result.rowCount });
+  } catch (err) {
+    console.error("delete buyers by source failed:", err.message);
+    res.status(500).json({ error: "Could not delete buyers for that source.", detail: err.message });
+  }
+});
+
 // DELETE /api/buyers/:id — the "Delete" action. Permanently removes
 // the registration row. Used sparingly — confirmed on the frontend first.
 app.delete("/api/buyers/:id", requireAuth, async (req, res) => {
@@ -716,39 +753,6 @@ app.post("/api/buyers/bulk/:batchId/revert", requireAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
-// Delete all buyers with a given Source — the cleanup tool for rows
-// that predate Bulk Upload batch-tracking (or any other case where you
-// just want every row of one source gone, not a specific batch).
-// GET first to show the admin exactly how many rows are about to be
-// deleted before they commit to the DELETE, mirroring the two-step
-// pattern used everywhere else destructive in this portal.
-// ---------------------------------------------------------------------
-app.get("/api/buyers/by-source/count", requireAuth, async (req, res) => {
-  const source = (req.query.source || "").toString().trim();
-  if (!source) return res.status(400).json({ error: "source is required." });
-  try {
-    const result = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM ${buyers_TABLE} WHERE ${COL.source} = $1`,
-      [source]
-    );
-    res.json({ count: result.rows[0].count });
-  } catch (err) {
-    console.error("count buyers by source failed:", err.message);
-    res.status(500).json({ error: "Could not count buyers for that source.", detail: err.message });
-  }
-});
-
-app.delete("/api/buyers/by-source", requireAuth, async (req, res) => {
-  const source = ((req.body && req.body.source) || "").toString().trim();
-  if (!source) return res.status(400).json({ error: "source is required." });
-  try {
-    const result = await pool.query(`DELETE FROM ${buyers_TABLE} WHERE ${COL.source} = $1`, [source]);
-    res.json({ success: true, deletedCount: result.rowCount });
-  } catch (err) {
-    console.error("delete buyers by source failed:", err.message);
-    res.status(500).json({ error: "Could not delete buyers for that source.", detail: err.message });
-  }
-});
 
 app.get("/api/analytics/buyers", requireAuth, async (req, res) => {
   try {
