@@ -767,9 +767,55 @@ const BULK_HEADER_ALIASES = {
   // "please select your products of interest?" — Meta form header for
   // this event.
   pleaseselectyourproductsofinterest: "productsOfInterest",
+  // "Address - City/Suburb", "Address - State", "Address - Zip/Post Code",
+  // "Address - Country", "Products of interest (Please specify)" — the
+  // exact headers used by the WhatsApp-collected buyer registration form
+  // export. Without these, State/District/Pincode/Country/Products of
+  // Interest were silently dropped for every row from that file even
+  // though the sheet had the data.
+  addresscitysuburb: "district",
+  addressstate: "state",
+  addresszippostcode: "pincode",
+  addresscountry: "country",
+  productsofinterestpleasespecify: "productsOfInterest",
 };
 function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// ---------------------------------------------------------------------
+// Fuzzy fallback matching — only used when a column header doesn't match
+// anything in BULK_HEADER_ALIASES above. Different lead sources (WhatsApp
+// forms, Meta/Facebook exports, hand-built sheets from an event partner,
+// etc.) keep inventing new header wordings for the same nine fields the
+// portal cares about — "Address - State" vs "State/Province" vs "please
+// choose your state", "Zip/Post Code" vs "PIN Code", and so on. Rather
+// than needing a code change every time a new file shows up with a
+// slightly different header, these patterns catch the common wording for
+// each field so it still lands in the right column.
+//
+// Deliberately scoped to ONLY these nine optional fields — Full Name,
+// Company Name, Email and Phone (the fields required for a row to import
+// at all) are matched by exact alias only, so a mis-worded column never
+// silently misfiles into one of those.
+// ---------------------------------------------------------------------
+const BULK_HEADER_FUZZY_RULES = [
+  { field: "country", test: /country|nation/ },
+  { field: "state", test: /state|province/ },
+  { field: "district", test: /district|city|suburb|town/ },
+  { field: "pincode", test: /pincode|pinno|zipcode|zippostcode|postalcode|postcode|^zip$/ },
+  { field: "natureOfBusiness", test: /natureofbusiness|businessnature|industrytype|typeofbusiness/ },
+  { field: "annualTurnover", test: /annualturnover|turnover|annualsales|annualrevenue/ },
+  { field: "knownThrough", test: /knownthrough|hearabout|howdidyouhear|leadsource|referralsource/ },
+  { field: "onlineSeller", test: /onlineseller|sellonline|ecommerceseller/ },
+  { field: "productsOfInterest", test: /productsofinterest|productinterest|interestedproducts|productcategor/ },
+];
+function matchBulkHeader(normalizedHeader) {
+  if (BULK_HEADER_ALIASES[normalizedHeader]) return BULK_HEADER_ALIASES[normalizedHeader];
+  for (const rule of BULK_HEADER_FUZZY_RULES) {
+    if (rule.test.test(normalizedHeader)) return rule.field;
+  }
+  return null;
 }
 
 // Minimal CSV parser — handles quoted fields, embedded commas/newlines,
@@ -908,7 +954,7 @@ function openBulkUploadModal() {
 function bulkUploadHandleParsedRows(rows, previewEl, errorEl, submitBtn) {
   if (rows.length < 2) throw new Error("File has no data rows.");
   const headerRow = rows[0].map(normalizeHeader);
-  const mappedKeys = headerRow.map((h) => BULK_HEADER_ALIASES[h] || null);
+  const mappedKeys = headerRow.map(matchBulkHeader);
   if (!mappedKeys.includes("fullName") || !mappedKeys.includes("companyName") ||
       !mappedKeys.includes("email") || !mappedKeys.includes("phone")) {
     throw new Error('File must include columns for Full Name, Company Name, Email, and Phone (names are matched loosely — "Name", "Company", "Mobile" etc. also work).');
