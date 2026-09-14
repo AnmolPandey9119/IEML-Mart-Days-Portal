@@ -235,12 +235,10 @@ function renderbuyers() {
   headerActions.innerHTML = `
     <button class="btn" id="bulkUploadBtn">${ic('upload')} Bulk Upload</button>
     <button class="btn" id="bulkHistoryBtn">${ic('clock')} Bulk Upload History</button>
-    <button class="btn danger" id="deleteBySourceBtn">${ic('trash')} Delete by Source</button>
     <button class="btn" id="exportBtn">${ic('download')} Export CSV</button>
   `;
   document.getElementById("bulkUploadBtn").addEventListener("click", openBulkUploadModal);
   document.getElementById("bulkHistoryBtn").addEventListener("click", openBulkHistoryModal);
-  document.getElementById("deleteBySourceBtn").addEventListener("click", openDeleteBySourceModal);
   document.getElementById("exportBtn").addEventListener("click", () => {
     window.location.href = "/api/buyers/export?" + visitorFilterParams().toString();
   });
@@ -1001,7 +999,7 @@ async function openBulkHistoryModal() {
   try {
     const res = await fetch("/api/buyers/bulk/batches");
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Could not load bulk upload history.");
+    if (!res.ok) throw new Error(data.detail || data.error || "Could not load bulk upload history.");
     renderBulkHistoryList(data.batches || []);
   } catch (err) {
     body.innerHTML = `<div class="modal-error">${esc(err.message)}</div>`;
@@ -1049,7 +1047,7 @@ function renderBulkHistoryList(batches) {
         async () => {
           const res = await fetch(`/api/buyers/bulk/${batchId}/revert`, { method: "POST" });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Could not revert this bulk upload.");
+          if (!res.ok) throw new Error(data.detail || data.error || "Could not revert this bulk upload.");
           return data;
         },
         () => {
@@ -1060,91 +1058,6 @@ function renderBulkHistoryList(batches) {
     });
   });
 }
-
-// ---------------------------------------------------------------------
-// Delete by Source — for cleaning up rows that predate Bulk Upload's
-// batch tracking (e.g. old uploads from before this feature existed),
-// or any other case where every row of one source should just be gone.
-// Unlike Revert, this isn't scoped to a single batch — it removes every
-// buyer row with the chosen source, however it got there. Shows a live
-// count before anything is deleted, then still goes through the same
-// two-click danger-confirm popup as everything else destructive here.
-// ---------------------------------------------------------------------
-function openDeleteBySourceModal() {
-  const backdrop = document.getElementById("deleteBySourceModalBackdrop");
-  const body = document.getElementById("deleteBySourceModalBody");
-  const errorEl = document.getElementById("deleteBySourceModalError");
-  const submitBtn = document.getElementById("deleteBySourceModalSubmit");
-  errorEl.textContent = "";
-  submitBtn.style.display = "none";
-  let currentCount = 0;
-
-  body.innerHTML = `
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 14px;">
-      Permanently deletes every buyer row tagged with the source you pick below — the whole
-      source, not just one upload. Useful for clearing out an old bulk import that happened
-      before Bulk Upload History existed.
-    </p>
-    <div class="field full" style="margin-bottom:10px;">
-      <label>Source</label>
-      <select id="deleteBySourceSelect">
-        <option value="">Select a source…</option>
-        ${SOURCE_OPTIONS.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}
-      </select>
-    </div>
-    <div id="deleteBySourceCount" style="font-size:13px;color:var(--muted);"></div>
-  `;
-  backdrop.classList.add("show");
-
-  const select = document.getElementById("deleteBySourceSelect");
-  const countEl = document.getElementById("deleteBySourceCount");
-
-  select.addEventListener("change", async () => {
-    errorEl.textContent = "";
-    submitBtn.style.display = "none";
-    countEl.textContent = "";
-    currentCount = 0;
-    const source = select.value;
-    if (!source) return;
-    countEl.textContent = "Counting…";
-    try {
-      const res = await fetch("/api/buyers/by-source/count?source=" + encodeURIComponent(source));
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not count buyers for that source.");
-      currentCount = data.count;
-      countEl.innerHTML = `<b>${data.count}</b> buyer${data.count === 1 ? "" : "s"} currently tagged Source: ${esc(source)}.`;
-      submitBtn.style.display = data.count > 0 ? "inline-block" : "none";
-    } catch (err) {
-      errorEl.textContent = err.message;
-    }
-  });
-
-  submitBtn.onclick = () => {
-    const source = select.value;
-    if (!source || currentCount === 0) return;
-    openDangerConfirmModal(
-      `This will permanently delete all ${currentCount} buyer${currentCount === 1 ? "" : "s"} tagged Source: ${source}. This cannot be undone.`,
-      async () => {
-        const res = await fetch("/api/buyers/by-source", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not delete buyers for that source.");
-        return data;
-      },
-      () => {
-        backdrop.classList.remove("show");
-        if (currentView === "buyers") loadbuyers();
-      }
-    );
-  };
-}
-
-document.getElementById("deleteBySourceModalCancel").addEventListener("click", () => {
-  document.getElementById("deleteBySourceModalBackdrop").classList.remove("show");
-});
 
 // ---------------------------------------------------------------------
 // Mart Owners
