@@ -1066,7 +1066,7 @@ app.get("/api/schema-check", requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT table_name, column_name, data_type
        FROM information_schema.columns
-       WHERE table_name IN ($1, 'mart_owners')
+       WHERE table_name IN ($1, 'mart_owners', 'bulk_upload_batches')
        ORDER BY table_name, ordinal_position`,
       [buyers_TABLE]
     );
