@@ -1519,11 +1519,22 @@ async function renderAnalytics() {
 // read-only view (with a "Clear History" action for the audit log only;
 // it never touches any buyer's own print_count or checked-in status).
 // ---------------------------------------------------------------------
-const printHistoryState = { page: 1, pageSize: 25 };
+const printHistoryState = { page: 1, pageSize: 25, day: "" };
 
 async function renderPrintHistory() {
   pageTitle.textContent = "Print History";
-  headerActions.innerHTML = `<button class="btn danger" id="clearHistoryBtn">${ic('trash')} Clear History</button>`;
+  headerActions.innerHTML = `
+    <button class="btn" id="exportPrintHistoryBtn">${ic('download')} Export${printHistoryState.day ? ` (${printHistoryState.day})` : ""}</button>
+    <button class="btn" id="exportPrintHistoryOverallBtn">${ic('download')} Export Overall (All Days)</button>
+    <button class="btn danger" id="clearHistoryBtn">${ic('trash')} Clear History</button>
+  `;
+  document.getElementById("exportPrintHistoryBtn").addEventListener("click", () => {
+    const params = printHistoryState.day ? `?day=${encodeURIComponent(printHistoryState.day)}` : "";
+    window.location.href = `/api/print-history/export${params}`;
+  });
+  document.getElementById("exportPrintHistoryOverallBtn").addEventListener("click", () => {
+    window.location.href = "/api/print-history/export";
+  });
   document.getElementById("clearHistoryBtn").addEventListener("click", async () => {
     if (!confirm("Clear the entire print history log? This only removes the audit trail — buyers keep their individual print counts and checked-in status. This cannot be undone.")) return;
     try {
@@ -1539,9 +1550,11 @@ async function renderPrintHistory() {
 
   viewArea.innerHTML = `<div class="loading-state">Loading print history…</div>`;
   try {
+    const historyParams = new URLSearchParams({ page: printHistoryState.page, pageSize: printHistoryState.pageSize });
+    if (printHistoryState.day) historyParams.set("day", printHistoryState.day);
     const [summary, historyRes] = await Promise.all([
       fetch("/api/print-history/summary").then((r) => r.json()),
-      fetch(`/api/print-history?page=${printHistoryState.page}&pageSize=${printHistoryState.pageSize}`).then((r) => r.json()),
+      fetch(`/api/print-history?${historyParams.toString()}`).then((r) => r.json()),
     ]);
     const maxDay = Math.max(1, ...summary.byDay.map((r) => r.count));
     const maxPage = Math.max(1, Math.ceil(historyRes.total / printHistoryState.pageSize));
@@ -1564,6 +1577,15 @@ async function renderPrintHistory() {
 
       <div class="panel">
         <h3>${ic('receipt')} Recent print events</h3>
+        <div class="toolbar" style="margin-bottom:14px;">
+          <div class="field-mini">
+            <label>Day</label>
+            <select id="phDayFilter">
+              <option value="">All Days</option>
+              ${summary.byDay.map((r) => `<option value="${esc(r.day)}" ${printHistoryState.day === r.day ? "selected" : ""}>${esc(r.day)} (${r.count})</option>`).join("")}
+            </select>
+          </div>
+        </div>
         ${historyRes.rows.length ? `
           <div class="table-scroll">
             <table>
@@ -1584,10 +1606,16 @@ async function renderPrintHistory() {
             <span>Page ${historyRes.page} / ${maxPage}</span>
             <button class="btn" id="phNextPage" ${printHistoryState.page >= maxPage ? "disabled" : ""}>Next →</button>
           </div>
-        ` : `<div class="empty-state">No print events yet.</div>`}
+        ` : `<div class="empty-state">No print events${printHistoryState.day ? ` on ${esc(printHistoryState.day)}` : ""} yet.</div>`}
       </div>
     `;
 
+    const dayFilter = document.getElementById("phDayFilter");
+    if (dayFilter) dayFilter.addEventListener("change", (e) => {
+      printHistoryState.day = e.target.value;
+      printHistoryState.page = 1;
+      renderPrintHistory();
+    });
     const prevBtn = document.getElementById("phPrevPage");
     const nextBtn = document.getElementById("phNextPage");
     if (prevBtn) prevBtn.addEventListener("click", () => { printHistoryState.page--; renderPrintHistory(); });

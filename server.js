@@ -957,6 +957,59 @@ app.get("/api/print-history", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/print-history/export — CSV export of the print history audit
+// log, with the FULL buyer record joined in (every field the buyer form
+// collects — not just name/company as shown in the on-screen table),
+// plus exactly which day/time each print happened. Pass ?day=YYYY-MM-DD
+// to export just that day; leave it off (or pass day=all) for a single
+// "overall" file covering every day's prints at once.
+app.get("/api/print-history/export", requireAuth, async (req, res) => {
+  const day = req.query.day && /^\d{4}-\d{2}-\d{2}$/.test(req.query.day) ? req.query.day : null;
+  const where = day ? "WHERE TO_CHAR(l.printed_at, 'YYYY-MM-DD') = $1" : "";
+  const values = day ? [day] : [];
+
+  try {
+    const result = await pool.query(
+      `SELECT l.printed_at, l.urn AS log_urn, b.*
+       FROM badge_print_log l
+       LEFT JOIN ${buyers_TABLE} b ON b.${COL.urn} = l.urn
+       ${where}
+       ORDER BY l.printed_at DESC`,
+      values
+    );
+
+    const headers = [
+      "printedDay", "printedAt",
+      ...VISITOR_LIST_COLUMNS.map((c) => c.key),
+      "status", "attended", "attendedAt",
+      "printCount", "scanCount", "lastScannedAt", "badgeDownloadCount",
+    ];
+    const escape = (val) => {
+      if (val === null || val === undefined) return "";
+      return `"${String(val).replace(/"/g, '""')}"`;
+    };
+    const lines = [headers.join(",")];
+    for (const row of result.rows) {
+      const mapped = mapVisitorRow(row);
+      if (!mapped.urn) mapped.urn = row.log_urn; // buyer row deleted since — keep the URN anyway
+      const printedAt = row.printed_at;
+      const record = {
+        ...mapped,
+        printedAt: printedAt ? new Date(printedAt).toLocaleString("en-IN") : "",
+        printedDay: printedAt ? new Date(printedAt).toLocaleDateString("en-CA") : "", // YYYY-MM-DD
+      };
+      lines.push(headers.map((h) => escape(record[h])).join(","));
+    }
+    const filename = day ? `print-history-${day}.csv` : "print-history-overall.csv";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + lines.join("\n"));
+  } catch (err) {
+    console.error("export print-history failed:", err.message);
+    res.status(500).json({ error: "Could not export print history.", detail: err.message });
+  }
+});
+
 app.get("/api/print-history/summary", requireAuth, async (req, res) => {
   try {
     const [totalRes, todayRes, byDayRes] = await Promise.all([
