@@ -21,9 +21,9 @@ app.set("trust proxy", 1); // Render sits behind a proxy — needed so req.ip is
 // ---------------------------------------------------------------------
 const BRANDING = {
   eventName: process.env.EVENT_NAME || "IEML Mart Sourcing Days",
-  edition: process.env.EVENT_EDITION || "29th Edition · Mega Mart",
+  edition: process.env.EVENT_EDITION || "30th Edition · Mega Mart",
   tagline: process.env.EVENT_TAGLINE || "Source Better. Discover More.",
-  dateRange: process.env.EVENT_DATE_RANGE || "16–17 Sept 2026",
+  dateRange: process.env.EVENT_DATE_RANGE || "22–23 Oct 2026",
   venue: process.env.EVENT_VENUE || "India Expo Centre & Mart, Greater Noida, UP",
   registrationUrl: process.env.REGISTRATION_URL || "https://ieml-martdays-registration.vercel.app/",
 };
@@ -135,7 +135,61 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get("/", (req, res) => res.redirect("/login.html"));
-app.get("/api/branding", (req, res) => res.json(BRANDING));
+// ---------------------------------------------------------------------
+// LIVE EDITION — edition / dates / venue are read straight from the
+// `mart_days_edition` table in the SAME Neon database this portal already
+// uses. That table is what the martdays-admin page edits every month, so
+// nothing here changes when the month changes and there is no dependency
+// on the Mart Days backend being awake. The BRANDING values above are
+// only the FALLBACK (e.g. before the backend has created the table).
+// Cached for 30s so the dashboard doesn't query on every page load.
+// ---------------------------------------------------------------------
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function ordinal(n) {
+  const v = n % 100;
+  if (v >= 10 && v <= 20) return `${n}th`;
+  return `${n}${{ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
+}
+function formatDatesShort(a, b) { // a, b = "YYYY-MM-DD"
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  if (ay === by && am === bm && ad === bd) return `${ad} ${MONTHS_SHORT[bm - 1]} ${by}`;
+  if (ay !== by) return `${ad} ${MONTHS_SHORT[am - 1]} ${ay} – ${bd} ${MONTHS_SHORT[bm - 1]} ${by}`;
+  if (am !== bm) return `${ad} ${MONTHS_SHORT[am - 1]} – ${bd} ${MONTHS_SHORT[bm - 1]} ${by}`;
+  return `${ad}–${bd} ${MONTHS_SHORT[bm - 1]} ${by}`;
+}
+
+let liveEdition = { at: 0, data: null };
+async function getLiveEdition() {
+  if (Date.now() - liveEdition.at < 30_000) return liveEdition.data;
+  try {
+    const { rows } = await pool.query(
+      "SELECT edition_number, event_name, badge_tag, venue, to_char(start_date,'YYYY-MM-DD') AS s, to_char(end_date,'YYYY-MM-DD') AS e FROM mart_days_edition WHERE id = 1"
+    );
+    if (rows[0]) {
+      const r = rows[0];
+      liveEdition = {
+        at: Date.now(),
+        data: {
+          eventName: r.event_name,
+          edition: `${ordinal(r.edition_number)} Edition${r.badge_tag ? " · " + r.badge_tag : ""}`,
+          dateRange: formatDatesShort(r.s, r.e),
+          venue: r.venue,
+        },
+      };
+      return liveEdition.data;
+    }
+  } catch (err) {
+    console.warn("[branding] live edition unavailable, using fallback:", err.message);
+  }
+  liveEdition = { at: Date.now(), data: null };
+  return null;
+}
+
+app.get("/api/branding", async (req, res) => {
+  const live = await getLiveEdition();
+  res.json({ ...BRANDING, ...(live || {}) });
+});
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders: (res, filePath) => {
     // HTML must always be revalidated (so deploys show up immediately);

@@ -76,8 +76,8 @@ Agar step 2 sirf local pe kiya tha, to production Neon DB pe bhi ek baar chalana
 - **Mart Owners** tab me "+ Add Mart Owner" se manually entries daal sakte ho jab list mile.
 - **Analytics** tab automatically buyers table se numbers nikalta hai, kuch bhi manually update nahi karna padta.
 
-## Agle Mart Sourcing Days ke liye
-Yeh portal "IEML Mart Sourcing Days" ke liye generic hai (har mahine hone wala event) — koi date/edition hardcode nahi hai, sirf `EVENT_DATE_RANGE` env var update karte raho har baar (ya blank chhod do, sirf header pe dikhta hai, data pe koi asar nahi).
+## Agle Mart Sourcing Days
+Edition / dates / venue ab **database se live** aate hain — `mart_days_edition` table (same Neon DB), jise `martdays-admin` page me har mahine badalte ho. Is portal me kuch badalna ya redeploy nahi karna padta (change ~30 sec me dikhta hai). Table na mile to `EVENT_EDITION` / `EVENT_DATE_RANGE` wali values fallback ki tarah dikhti hain.
 
 ## Local run
 ```bash
