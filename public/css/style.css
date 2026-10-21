@@ -1049,3 +1049,20 @@
      .login-brand-panel .identity-subheading { font-size: 22px; }
      .login-card h1 { font-size: 30px; }
    }
+
+   /* ---------- Faint venue photo (very light, just a hint) ---------- */
+   /* Sidebar & login panel: let the gate photo show a little more */
+   :root { --rail-gradient: linear-gradient(165deg, rgba(124,45,20,0.86) 0%, rgba(75,34,16,0.84) 100%); }
+
+   /* Content area: a barely-there photo fading in from the bottom-right */
+   body::before {
+     content: "";
+     position: fixed; right: 0; bottom: 0; z-index: -1;
+     width: min(560px, 60vw); height: 70vh;
+     background: url("/assets/expo-mart-gate.png") right bottom / cover no-repeat;
+     opacity: 0.09;
+     -webkit-mask-image: linear-gradient(to top left, #000 0%, transparent 75%);
+     mask-image: linear-gradient(to top left, #000 0%, transparent 75%);
+     pointer-events: none;
+   }
+   @media (max-width: 900px) { body::before { width: 100vw; opacity: 0.07; } }
