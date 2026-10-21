@@ -1309,8 +1309,8 @@ document.getElementById("ownerModalSave").addEventListener("click", async () => 
 // ---------------------------------------------------------------------
 // Analytics
 // ---------------------------------------------------------------------
-const STATUS_COLORS = { Registered: "#3a4fb0", Approved: "#1e8e5a", Rejected: "#c0392b" };
-const CHART_PALETTE = ["#d3004c", "#f4b942", "#3a4fb0", "#1e8e5a", "#b3690a", "#7a3fc9", "#2ba8b0", "#c0392b", "#8a8a3a", "#5a5a7a"];
+const STATUS_COLORS = { Registered: "#c98a1b", Approved: "#1f7a4d", Rejected: "#b3261e" };
+const CHART_PALETTE = ["#a2401e", "#e4a82e", "#1f4d33", "#8a5a2b", "#c98a1b", "#6b7a1f", "#2f7f73", "#b3261e", "#c4592f", "#85705f"];
 const chartInstances = {};
 
 function destroyChart(key) {
@@ -1340,12 +1340,12 @@ function makeHBar(canvasId, labels, values, key, color) {
   if (!ctx || typeof Chart === "undefined") return;
   chartInstances[key] = new Chart(ctx, {
     type: "bar",
-    data: { labels, datasets: [{ data: values, backgroundColor: color || "#d3004c", borderRadius: 5, maxBarThickness: 22 }] },
+    data: { labels, datasets: [{ data: values, backgroundColor: color || "#a2401e", borderRadius: 5, maxBarThickness: 22 }] },
     options: {
       indexAxis: "y", responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f2e6ec" } },
+        x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f1e3cc" } },
         y: { grid: { display: false } },
       },
     },
@@ -1362,11 +1362,11 @@ function makeLine(canvasId, labels, dailyValues, cumulativeValues, key) {
       labels,
       datasets: [
         {
-          label: "Daily registrations", data: dailyValues, borderColor: "#d3004c",
-          backgroundColor: "rgba(211,0,76,0.12)", fill: true, tension: 0.3, pointRadius: 2, yAxisID: "y",
+          label: "Daily registrations", data: dailyValues, borderColor: "#a2401e",
+          backgroundColor: "rgba(162,64,30,0.12)", fill: true, tension: 0.3, pointRadius: 2, yAxisID: "y",
         },
         {
-          label: "Cumulative total", data: cumulativeValues, borderColor: "#3a4fb0",
+          label: "Cumulative total", data: cumulativeValues, borderColor: "#1f4d33",
           backgroundColor: "transparent", borderDash: [5, 4], fill: false, tension: 0.25, pointRadius: 0, yAxisID: "y1",
         },
       ],
@@ -1377,7 +1377,7 @@ function makeLine(canvasId, labels, dailyValues, cumulativeValues, key) {
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 14, font: { size: 12 } } } },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
-        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f2e6ec" }, title: { display: true, text: "Per day" } },
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#f1e3cc" }, title: { display: true, text: "Per day" } },
         y1: { beginAtZero: true, position: "right", grid: { display: false }, ticks: { precision: 0 }, title: { display: true, text: "Cumulative" } },
       },
     },
@@ -1404,8 +1404,8 @@ async function renderAnalytics() {
           <svg class="hero-ring-svg" viewBox="0 0 120 120">
             <defs>
               <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#ff2d78"/>
-                <stop offset="100%" stop-color="#a3003b"/>
+                <stop offset="0%" stop-color="#2f8a5a"/>
+                <stop offset="100%" stop-color="#143723"/>
               </linearGradient>
             </defs>
             <circle class="ring-track" cx="60" cy="60" r="52"></circle>
@@ -1484,7 +1484,7 @@ async function renderAnalytics() {
     `;
 
     if (data.total) {
-      makeDoughnut("chkCheckin", ["Checked In", "Yet to Arrive"], [data.attended, data.notAttended], ["#1e8e5a", "#fde6ee"], "checkin");
+      makeDoughnut("chkCheckin", ["Checked In", "Yet to Arrive"], [data.attended, data.notAttended], ["#1f7a4d", "#f1e3cc"], "checkin");
     }
     if (byStatus.length) {
       makeDoughnut("chkStatus", byStatus.map((r) => r.label),
@@ -1495,16 +1495,16 @@ async function renderAnalytics() {
       makeLine("chkTrend", data.trend.map((r) => r.label), data.trend.map((r) => r.count), cumulative, "trend");
     }
     if (data.byBuyerType.length) {
-      makeHBar("chkBuyerType", data.byBuyerType.map((r) => r.label), data.byBuyerType.map((r) => r.count), "buyerType", "#d3004c");
+      makeHBar("chkBuyerType", data.byBuyerType.map((r) => r.label), data.byBuyerType.map((r) => r.count), "buyerType", "#a2401e");
     }
     if (data.byCountry.length) {
-      makeHBar("chkCountry", data.byCountry.map((r) => r.label), data.byCountry.map((r) => r.count), "country", "#3a4fb0");
+      makeHBar("chkCountry", data.byCountry.map((r) => r.label), data.byCountry.map((r) => r.count), "country", "#1f4d33");
     }
     if (data.byState && data.byState.length) {
-      makeHBar("chkState", data.byState.map((r) => r.label), data.byState.map((r) => r.count), "state", "#1e8e5a");
+      makeHBar("chkState", data.byState.map((r) => r.label), data.byState.map((r) => r.count), "state", "#c98a1b");
     }
     if (data.byKnownThrough && data.byKnownThrough.length) {
-      makeHBar("chkKnownThrough", data.byKnownThrough.map((r) => r.label), data.byKnownThrough.map((r) => r.count), "knownThrough", "#b3690a");
+      makeHBar("chkKnownThrough", data.byKnownThrough.map((r) => r.label), data.byKnownThrough.map((r) => r.count), "knownThrough", "#8a5a2b");
     }
   } catch (err) {
     viewArea.innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
