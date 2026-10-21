@@ -248,38 +248,8 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_MAX_ATTEMPTS = 5;
-const loginAttemptsByIp = new Map();
-function isLoginRateLimited(ip) {
-  const entry = loginAttemptsByIp.get(ip);
-  if (!entry) return false;
-  if (Date.now() - entry.windowStart > LOGIN_WINDOW_MS) {
-    loginAttemptsByIp.delete(ip);
-    return false;
-  }
-  return entry.count >= LOGIN_MAX_ATTEMPTS;
-}
-function recordFailedLogin(ip) {
-  const now = Date.now();
-  const entry = loginAttemptsByIp.get(ip);
-  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
-    loginAttemptsByIp.set(ip, { count: 1, windowStart: now });
-  } else {
-    entry.count += 1;
-  }
-}
-function clearLoginAttempts(ip) {
-  loginAttemptsByIp.delete(ip);
-}
-
 app.post("/api/login", (req, res) => {
   if (!requireJwtSecret(res)) return;
-  const ip = req.ip;
-  if (isLoginRateLimited(ip)) {
-    res.set("Retry-After", "900");
-    return res.status(429).json({ error: "Too many sign-in attempts. Please wait 15 minutes." });
-  }
   const { username, password } = req.body || {};
   const validUser = process.env.ADMIN_USERNAME;
   const validPass = process.env.ADMIN_PASSWORD;
@@ -287,10 +257,8 @@ app.post("/api/login", (req, res) => {
     return res.status(500).json({ error: "Admin credentials are not configured on the server." });
   }
   if (!safeCompare(username, validUser) || !safeCompare(password, validPass)) {
-    recordFailedLogin(ip);
     return res.status(401).json({ error: "Invalid username or password." });
   }
-  clearLoginAttempts(ip);
   const token = signToken(username);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
