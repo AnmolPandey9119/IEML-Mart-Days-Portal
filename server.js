@@ -588,6 +588,81 @@ function normalizePhoneForDupeCheck(val) {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 
+// ---------------------------------------------------------------------
+// AiSensy WhatsApp trigger — sent right after each bulk-uploaded row is
+// inserted, same campaign/template the public registration form uses.
+// Configure via env (see .env.example):
+//   AISENSY_API_KEY          — AiSensy API key (required, else feature is off)
+//   AISENSY_CAMPAIGN_NAME    — the live API campaign name (required)
+//   AISENSY_TEMPLATE_PARAMS  — comma-separated buyer fields, in the exact
+//                              order of the template's {{1}}, {{2}}... e.g.
+//                              "fullName,urn". Available: fullName, urn,
+//                              companyName, email, phone. Default: fullName
+//   AISENSY_DEFAULT_COUNTRY_CODE — default "91"
+// A WhatsApp failure NEVER fails the row/upload — it is only counted and
+// reported back.
+// ---------------------------------------------------------------------
+const AISENSY_URL = "https://backend.aisensy.com/campaign/t1/api/v2";
+function aisensyEnabled() {
+  return !!(process.env.AISENSY_API_KEY && process.env.AISENSY_CAMPAIGN_NAME);
+}
+function toWhatsAppDestination(val) {
+  const digits = String(val || "").replace(/\D/g, "");
+  const cc = process.env.AISENSY_DEFAULT_COUNTRY_CODE || "91";
+  if (digits.length < 10) return null;
+  if (digits.length === 10) return cc + digits;
+  if (digits.length === 11 && digits.startsWith("0")) return cc + digits.slice(1);
+  return digits; // already carries a country code
+}
+async function sendAisensyWelcome({ urn, fullName, companyName, email, phone }) {
+  const destination = toWhatsAppDestination(phone);
+  if (!destination) return { ok: false, error: "invalid phone number" };
+  const fieldMap = { urn, fullName, companyName, email, phone };
+  const names = (process.env.AISENSY_TEMPLATE_PARAMS || "fullName").split(",").map((s) => s.trim()).filter(Boolean);
+  const templateParams = names.map((n) => String(fieldMap[n] || "-"));
+  try {
+    const r = await fetch(AISENSY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10000),
+      body: JSON.stringify({
+        apiKey: process.env.AISENSY_API_KEY,
+        campaignName: process.env.AISENSY_CAMPAIGN_NAME,
+        destination,
+        userName: fullName || "Visitor",
+        templateParams,
+        source: "mart-portal-bulk-upload",
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      return { ok: false, error: `AiSensy ${r.status}: ${t.slice(0, 150)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// WhatsApp diagnostics (login required).
+//   GET  /api/whatsapp/status  -> which env vars the server can see (no secrets)
+//   POST /api/whatsapp/test    -> body {phone, fullName?, urn?} sends ONE real
+//                                 message and returns AiSensy's raw response
+app.get("/api/whatsapp/status", requireAuth, (req, res) => {
+  res.json({
+    enabled: aisensyEnabled(),
+    AISENSY_API_KEY: !!process.env.AISENSY_API_KEY,
+    AISENSY_CAMPAIGN_NAME: process.env.AISENSY_CAMPAIGN_NAME || null,
+    AISENSY_TEMPLATE_PARAMS: process.env.AISENSY_TEMPLATE_PARAMS || "fullName (default)",
+  });
+});
+app.post("/api/whatsapp/test", requireAuth, async (req, res) => {
+  if (!aisensyEnabled()) return res.status(400).json({ error: "AISENSY_API_KEY / AISENSY_CAMPAIGN_NAME not set on the server (redeploy after adding them)." });
+  const b = req.body || {};
+  const r = await sendAisensyWelcome({ urn: b.urn || "TEST01", fullName: b.fullName || "Test", companyName: b.companyName || "Test Co", email: b.email || "test@example.com", phone: b.phone });
+  res.json(r);
+});
+
 app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   const rows = Array.isArray(req.body && req.body.rows) ? req.body.rows : [];
   const source = req.body && req.body.source;
@@ -619,6 +694,10 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   let inserted = 0;
   const failed = [];
   const duplicates = [];
+  const whatsappEnabled = aisensyEnabled();
+  let whatsappSent = 0;
+  const whatsappFailed = [];
+  const waJobs = [];
 
   for (let i = 0; i < rows.length; i++) {
     const raw = rows[i] || {};
@@ -662,6 +741,7 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     const placeholders = cols.map((_, idx) => `$${idx + 1}`);
     let rowInserted = false;
     let lastErr = null;
+    let insertedUrn = null;
     // Up to 5 tries: a fresh random URN each attempt, in case of a
     // (very unlikely) collision with an existing 6-character code.
     for (let attempt = 0; attempt < 5 && !rowInserted; attempt++) {
@@ -672,6 +752,7 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
           values
         );
         rowInserted = true;
+        insertedUrn = values[0];
         inserted++;
       } catch (err) {
         lastErr = err;
@@ -680,7 +761,34 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     }
     if (!rowInserted) {
       failed.push({ row: i + 2, error: lastErr ? lastErr.message : "Unknown error while inserting row." });
+    } else if (whatsappEnabled) {
+      waJobs.push({
+        row: i + 2,
+        phone: raw.phone || "",
+        payload: {
+          urn: insertedUrn,
+          fullName: String(raw.fullName || "").trim(),
+          companyName: String(raw.companyName || "").trim(),
+          email: String(raw.email || "").trim(),
+          phone: raw.phone,
+        },
+      });
     }
+  }
+
+  // Registration done -> trigger the same WhatsApp as the public form.
+  // Sent 5 at a time (not one-by-one) so big uploads stay inside the
+  // serverless time limit.
+  for (let i = 0; i < waJobs.length; i += 5) {
+    const chunk = waJobs.slice(i, i + 5);
+    const results = await Promise.all(chunk.map((j) => sendAisensyWelcome(j.payload)));
+    results.forEach((wa, idx) => {
+      if (wa.ok) whatsappSent++;
+      else {
+        console.error("AiSensy send failed (row " + chunk[idx].row + "):", wa.error);
+        whatsappFailed.push({ row: chunk[idx].row, phone: chunk[idx].phone, error: wa.error });
+      }
+    });
   }
 
   // Log the batch itself (even if 0 rows ended up inserted, e.g. every
@@ -705,6 +813,10 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
     failed: failed.slice(0, 50),
     duplicateCount: duplicates.length,
     duplicates: duplicates.slice(0, 50),
+    whatsappEnabled,
+    whatsappSent,
+    whatsappFailedCount: whatsappFailed.length,
+    whatsappFailed: whatsappFailed.slice(0, 50),
   });
 });
 

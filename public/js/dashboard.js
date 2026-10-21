@@ -1015,6 +1015,13 @@ document.getElementById("bulkUploadModalSubmit").addEventListener("click", async
       <div class="empty-state" style="text-align:left;padding:12px;">
         <b style="color:var(--success);">${data.inserted} buyer${data.inserted === 1 ? "" : "s"} imported</b> with Source: ${esc(bulkUploadSelectedSource)}.
         ${data.duplicateCount ? `<br><span style="color:var(--warning, #b8860b);">${data.duplicateCount} row${data.duplicateCount === 1 ? "" : "s"} skipped as duplicates (email or phone already exists).</span>` : ""}
+        ${data.whatsappEnabled
+          ? `<br><b style="color:var(--success);">${data.whatsappSent} WhatsApp message${data.whatsappSent === 1 ? "" : "s"} sent.</b>`
+          : `<br><span style="color:var(--warning, #b8860b);">WhatsApp not configured (AISENSY_API_KEY / AISENSY_CAMPAIGN_NAME missing) — no messages sent.</span>`}
+        ${data.whatsappFailedCount ? `<br><span style="color:var(--error);">${data.whatsappFailedCount} WhatsApp message${data.whatsappFailedCount === 1 ? "" : "s"} failed:</span>
+          <ul style="margin:6px 0 0 18px;font-size:12.5px;">
+            ${data.whatsappFailed.map((f) => `<li>Row ${f.row} (${esc(f.phone)}): ${esc(f.error)}</li>`).join("")}
+          </ul>` : ""}
         ${data.failedCount ? `<br><span style="color:var(--error);">${data.failedCount} row${data.failedCount === 1 ? "" : "s"} failed:</span>
           <ul style="margin:6px 0 0 18px;font-size:12.5px;">
             ${data.failed.map((f) => `<li>Row ${f.row}: ${esc(f.error)}</li>`).join("")}
