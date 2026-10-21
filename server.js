@@ -589,54 +589,101 @@ function normalizePhoneForDupeCheck(val) {
 }
 
 // ---------------------------------------------------------------------
-// AiSensy WhatsApp trigger — sent right after each bulk-uploaded row is
-// inserted, same campaign/template the public registration form uses.
-// Configure via env (see .env.example):
-//   AISENSY_API_KEY          — AiSensy API key (required, else feature is off)
-//   AISENSY_CAMPAIGN_NAME    — the live API campaign name (required)
-//   AISENSY_TEMPLATE_PARAMS  — comma-separated buyer fields, in the exact
-//                              order of the template's {{1}}, {{2}}... e.g.
-//                              "fullName,urn". Available: fullName, urn,
-//                              companyName, email, phone. Default: fullName
-//   AISENSY_DEFAULT_COUNTRY_CODE — default "91"
-// A WhatsApp failure NEVER fails the row/upload — it is only counted and
-// reported back.
+// AiSensy WhatsApp trigger — mirrors the registration backend
+// (ieml-badgedesk / services/whatsapp_service.py) exactly: same campaign,
+// same template params, same e-badge PDF attached. Sent right after each
+// bulk-uploaded row is inserted. Env (set the SAME values the badgedesk
+// backend uses on Render):
+//   AISENSY_API_KEY, AISENSY_CAMPAIGN_NAME   — required, else feature is off
+//   AISENSY_PARAMS   — template {{1}},{{2}}... order. Default
+//                      "name,event,dates,venue,urn". Available: name, event,
+//                      edition, dates, timing, venue, co_located, urn, badge_link
+//   AISENSY_ATTACH_BADGE   — "false" for text-only (default true)
+//   BACKEND_PUBLIC_URL     — default https://ieml-badgedesk.onrender.com
+//   BADGE_DOWNLOAD_PAGE_URL — only for the badge_link param
+// Edition name / dates / venue are read live from `mart_days_edition`.
+// A WhatsApp failure NEVER fails a row/upload — only counted and reported.
 // ---------------------------------------------------------------------
-const AISENSY_URL = "https://backend.aisensy.com/campaign/t1/api/v2";
+const AISENSY_URL = process.env.AISENSY_API_URL || "https://backend.aisensy.com/campaign/t1/api/v2";
 function aisensyEnabled() {
   return !!(process.env.AISENSY_API_KEY && process.env.AISENSY_CAMPAIGN_NAME);
 }
-function toWhatsAppDestination(val) {
-  const digits = String(val || "").replace(/\D/g, "");
-  const cc = process.env.AISENSY_DEFAULT_COUNTRY_CODE || "91";
-  if (digits.length < 10) return null;
-  if (digits.length === 10) return cc + digits;
-  if (digits.length === 11 && digits.startsWith("0")) return cc + digits.slice(1);
-  return digits; // already carries a country code
+// '+91 98765 43210' / '9876543210' / '0987…' -> '+919876543210'
+function normalizeWhatsAppPhone(raw) {
+  raw = String(raw == null ? "" : raw).trim();
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (raw.startsWith("+")) return "+" + digits;
+  if (raw.startsWith("00")) return "+" + digits.slice(2);
+  if (digits.length === 10) return "+91" + digits;
+  if (digits.length === 11 && digits.startsWith("0")) return "+91" + digits.slice(1);
+  return "+" + digits;
 }
-async function sendAisensyWelcome({ urn, fullName, companyName, email, phone }) {
-  const destination = toWhatsAppDestination(phone);
-  if (!destination) return { ok: false, error: "invalid phone number" };
-  const fieldMap = { urn, fullName, companyName, email, phone };
-  const names = (process.env.AISENSY_TEMPLATE_PARAMS || "fullName").split(",").map((s) => s.trim()).filter(Boolean);
-  const templateParams = names.map((n) => String(fieldMap[n] || "-"));
+const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function formatEditionDates(s, e) {
+  const a = new Date(s + "T00:00:00Z"), b = new Date(e + "T00:00:00Z");
+  const m = (d) => MONTHS_LONG[d.getUTCMonth()];
+  if (s === e) return `${a.getUTCDate()} ${m(a)} ${a.getUTCFullYear()}`;
+  if (a.getUTCFullYear() !== b.getUTCFullYear()) return `${a.getUTCDate()} ${m(a)} ${a.getUTCFullYear()} – ${b.getUTCDate()} ${m(b)} ${b.getUTCFullYear()}`;
+  if (a.getUTCMonth() !== b.getUTCMonth()) return `${a.getUTCDate()} ${m(a)} – ${b.getUTCDate()} ${m(b)} ${b.getUTCFullYear()}`;
+  return `${a.getUTCDate()}–${b.getUTCDate()} ${m(b)} ${b.getUTCFullYear()}`;
+}
+// Read once per upload (not per row). Falls back to the same defaults the
+// badgedesk backend uses if the table can't be read.
+async function loadEditionForWhatsApp() {
+  const fb = { edition_number: 30, event_name: "IEML Mart Sourcing Days", timing: "11 AM–5 PM",
+    venue: "India Expo Centre & Mart, Greater Noida, Uttar Pradesh",
+    co_located_with: "Renewable Energy India 2026 / Battery India Expo 2026", s: "2026-10-22", e: "2026-10-23" };
+  try {
+    const r = await pool.query(
+      "SELECT edition_number, event_name, timing, venue, co_located_with, to_char(start_date,'YYYY-MM-DD') AS s, to_char(end_date,'YYYY-MM-DD') AS e FROM mart_days_edition WHERE id = 1");
+    if (r.rows[0]) return r.rows[0];
+  } catch (err) { console.error("edition read failed, using defaults:", err.message); }
+  return fb;
+}
+function whatsappParamValues(name, urn, ed) {
+  const label = `${ordinal(ed.edition_number)} Edition`;
+  return {
+    name: (name || "").trim() || "Guest",
+    event: `${ed.event_name} (${label})`,
+    edition: label,
+    dates: formatEditionDates(ed.s, ed.e),
+    timing: ed.timing || "",
+    venue: ed.venue || "",
+    co_located: ed.co_located_with || "",
+    urn,
+    badge_link: process.env.BADGE_DOWNLOAD_PAGE_URL || "",
+  };
+}
+async function sendAisensyWelcome({ urn, fullName, phone }, ed) {
+  const destination = normalizeWhatsAppPhone(phone);
+  if (!destination) return { ok: false, error: "no usable phone number" };
+  const values = whatsappParamValues(fullName, urn, ed);
+  const keys = (process.env.AISENSY_PARAMS || "name,event,dates,venue,urn").split(",").map((k) => k.trim()).filter((k) => k && k.toLowerCase() !== "none");
+  const unknown = keys.filter((k) => !(k in values));
+  if (unknown.length) return { ok: false, error: `AISENSY_PARAMS has unknown name(s): ${unknown.join(", ")}` };
+  const payload = {
+    apiKey: process.env.AISENSY_API_KEY,
+    campaignName: process.env.AISENSY_CAMPAIGN_NAME,
+    destination,
+    userName: values.name,
+    source: "Mart Days Registration",
+    templateParams: keys.map((k) => values[k] || "-"),
+  };
+  if (String(process.env.AISENSY_ATTACH_BADGE || "true").toLowerCase() !== "false") {
+    const base = (process.env.BACKEND_PUBLIC_URL || "https://ieml-badgedesk.onrender.com").replace(/\/+$/, "");
+    payload.media = { url: `${base}/api/mart-days/ebadge/${urn}.pdf`, filename: `${urn}-ebadge.pdf` };
+  }
   try {
     const r = await fetch(AISENSY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(10000),
-      body: JSON.stringify({
-        apiKey: process.env.AISENSY_API_KEY,
-        campaignName: process.env.AISENSY_CAMPAIGN_NAME,
-        destination,
-        userName: fullName || "Visitor",
-        templateParams,
-        source: "mart-portal-bulk-upload",
-      }),
+      signal: AbortSignal.timeout(25000),
+      body: JSON.stringify(payload),
     });
     if (!r.ok) {
       const t = await r.text().catch(() => "");
-      return { ok: false, error: `AiSensy ${r.status}: ${t.slice(0, 150)}` };
+      return { ok: false, error: `AiSensy ${r.status}: ${t.slice(0, 200)}` };
     }
     return { ok: true };
   } catch (err) {
@@ -646,20 +693,23 @@ async function sendAisensyWelcome({ urn, fullName, companyName, email, phone }) 
 
 // WhatsApp diagnostics (login required).
 //   GET  /api/whatsapp/status  -> which env vars the server can see (no secrets)
-//   POST /api/whatsapp/test    -> body {phone, fullName?, urn?} sends ONE real
+//   POST /api/whatsapp/test    -> body {phone, urn (a real URN), fullName?} sends ONE real
 //                                 message and returns AiSensy's raw response
 app.get("/api/whatsapp/status", requireAuth, (req, res) => {
   res.json({
     enabled: aisensyEnabled(),
     AISENSY_API_KEY: !!process.env.AISENSY_API_KEY,
     AISENSY_CAMPAIGN_NAME: process.env.AISENSY_CAMPAIGN_NAME || null,
-    AISENSY_TEMPLATE_PARAMS: process.env.AISENSY_TEMPLATE_PARAMS || "fullName (default)",
+    AISENSY_PARAMS: process.env.AISENSY_PARAMS || "name,event,dates,venue,urn (default)",
+    attachBadge: String(process.env.AISENSY_ATTACH_BADGE || "true").toLowerCase() !== "false",
+    BACKEND_PUBLIC_URL: process.env.BACKEND_PUBLIC_URL || "https://ieml-badgedesk.onrender.com (default)",
   });
 });
 app.post("/api/whatsapp/test", requireAuth, async (req, res) => {
   if (!aisensyEnabled()) return res.status(400).json({ error: "AISENSY_API_KEY / AISENSY_CAMPAIGN_NAME not set on the server (redeploy after adding them)." });
   const b = req.body || {};
-  const r = await sendAisensyWelcome({ urn: b.urn || "TEST01", fullName: b.fullName || "Test", companyName: b.companyName || "Test Co", email: b.email || "test@example.com", phone: b.phone });
+  // urn must be a REAL registration, else the e-badge PDF link 404s and AiSensy rejects it
+  const r = await sendAisensyWelcome({ urn: b.urn, fullName: b.fullName || "Test", phone: b.phone }, await loadEditionForWhatsApp());
   res.json(r);
 });
 
@@ -698,6 +748,7 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   let whatsappSent = 0;
   const whatsappFailed = [];
   const waJobs = [];
+  const waEdition = whatsappEnabled ? await loadEditionForWhatsApp() : null;
 
   for (let i = 0; i < rows.length; i++) {
     const raw = rows[i] || {};
@@ -765,13 +816,7 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
       waJobs.push({
         row: i + 2,
         phone: raw.phone || "",
-        payload: {
-          urn: insertedUrn,
-          fullName: String(raw.fullName || "").trim(),
-          companyName: String(raw.companyName || "").trim(),
-          email: String(raw.email || "").trim(),
-          phone: raw.phone,
-        },
+        payload: { urn: insertedUrn, fullName: String(raw.fullName || "").trim(), phone: raw.phone },
       });
     }
   }
@@ -781,7 +826,7 @@ app.post("/api/buyers/bulk", requireAuth, async (req, res) => {
   // serverless time limit.
   for (let i = 0; i < waJobs.length; i += 5) {
     const chunk = waJobs.slice(i, i + 5);
-    const results = await Promise.all(chunk.map((j) => sendAisensyWelcome(j.payload)));
+    const results = await Promise.all(chunk.map((j) => sendAisensyWelcome(j.payload, waEdition)));
     results.forEach((wa, idx) => {
       if (wa.ok) whatsappSent++;
       else {
